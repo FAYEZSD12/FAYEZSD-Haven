@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#101d1a" />
+    <meta name="description" content="FAYEZSD's Haven — a 3D survival game built with JavaScript and Three.js." />
+    <title>FAYEZSD's Haven • Survival Game</title>
+    <link rel="stylesheet" href="./src/style.css" />
+    <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.module.js"
+      }
+    }
+    </script>
+  </head>
+  <body>
+    <div id="game" aria-label="3D survival world"></div>
+    <div class="vignette" aria-hidden="true"></div>
+    <main id="ui">
+      <header class="topbar">
+        <div class="brand">
+          <div class="brand-icon" aria-hidden="true">✦</div>
+          <div><h1>FAYEZSD'S HAVEN</h1><p>THE SURVIVAL PROTOTYPE <span class="version">V 0.1</span></p></div>
+        </div>
+        <div class="world-info">
+          <span class="status-dot"></span><span id="day-readout">DAY 01 · MORNING</span>
+        </div>
+        <div class="header-actions">
+          <button id="save-btn" class="glass-button" type="button">↧ Save</button>
+          <button id="craft-toggle" class="primary-button" type="button">✦ Crafting <kbd>C</kbd></button>
+        </div>
+      </header>
+
+      <section class="quests glass" aria-label="Getting started goals">
+        <div class="panel-eyebrow">YOUR FIRST ADVENTURE</div>
+        <h2>Into the wild</h2>
+        <p class="panel-subtitle">Explore, gather and build your first base.</p>
+        <ul id="objectives">
+          <li data-goal="gather"><span class="quest-check"></span> Gather resources</li>
+          <li data-goal="craft"><span class="quest-check"></span> Craft an item</li>
+          <li data-goal="tame"><span class="quest-check"></span> Tame a wild animal</li>
+          <li data-goal="build"><span class="quest-check"></span> Build a structure</li>
+        </ul>
+        <p class="progress-label"><span id="quest-progress">0 / 4</span> TASKS COMPLETED</p>
+        <div class="progress-track"><div id="quest-progress-bar"></div></div>
+      </section>
+
+      <div id="interaction" class="interaction glass hidden" role="status" aria-live="polite">
+        <span class="interaction-key">E</span>
+        <div><strong id="interaction-title">Gather</strong><small id="interaction-hint">Press E to interact</small></div>
+      </div>
+
+      <div class="bottom-left">
+        <div class="vitals glass">
+          <div class="stat-row"><span>♥ Health</span><strong id="health-value">100</strong></div>
+          <div class="stat-track"><div id="health-fill" class="health-fill"></div></div>
+          <div class="stat-row"><span>◕ Hunger</span><strong id="hunger-value">100</strong></div>
+          <div class="stat-track"><div id="hunger-fill" class="hunger-fill"></div></div>
+          <div class="stat-row small-stat"><span>⌁ Companions</span><strong id="tamed-count">0</strong></div>
+        </div>
+      </div>
+
+      <nav id="hotbar" aria-label="Inventory hotbar" class="hotbar glass"></nav>
+
+      <div class="bottom-right glass controls">
+        <div class="panel-eyebrow">CONTROLS</div>
+        <div><kbd>W A S D</kbd> Move <span>·</span> <kbd>SHIFT</kbd> Run</div>
+        <div><kbd>DRAG</kbd> Camera <span>·</span> <kbd>E</kbd> Gather</div>
+        <div><kbd>T</kbd> Tame <span>·</span> <kbd>B</kbd> Build</div>
+        <div><kbd>C</kbd> Craft <span>·</span> <kbd>F</kbd> Eat</div>
+        <div><kbd>1 — 9</kbd> Select hotbar</div>
+      </div>
+
+      <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+      <div id="craft-backdrop" class="modal-backdrop hidden">
+        <section class="craft-panel" role="dialog" aria-modal="true" aria-label="Crafting menu">
+          <div class="craft-header">
+            <div><div class="panel-eyebrow">SURVIVAL WORKBENCH</div><h2>Crafting</h2><p>Turn materials into useful survival items.</p></div>
+            <button id="craft-close" class="close-button" type="button" aria-label="Close crafting panel">✕</button>
+          </div>
+          <div id="craft-recipes" class="recipe-list"></div>
+          <div class="craft-footer"><span id="craft-inventory"></span><span>Gather with <kbd>E</kbd> • Craft with a click</span></div>
+        </section>
+      </div>
+    </main>
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>

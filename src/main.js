@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { createAvatar } from './avatar.js?v=0.5';
 import { createForestMood, getDayNightInfo } from './forest.js?v=0.6';
 import { createNightEnemies } from './enemies.js?v=0.9';
+import { createHuntingAndCooking } from './hunting.js?v=1.0';
 import { RECIPES, BUILDABLE, STATISTICS, canAfford, craftRecipe, createBaseBuilding } from './building.js?v=0.8';
 const $=id=>document.getElementById(id);
 const scene=new THREE.Scene();scene.background=new THREE.Color(0xb9dce8);scene.fog=new THREE.Fog(0xb9dce8,55,155);
@@ -48,9 +49,18 @@ const player=avatar.player;
 player.position.set(2,height(2,14),14); // Spawn within reach of the crafting table.
 const base=createBaseBuilding(THREE,scene,mesh,mat,height,forest.campfirePosition);
 const threats=createNightEnemies(THREE,scene,mesh,mat,height,forest.campfirePosition,base);
-for(let i=0;i<12;i++){let x=rand(-65,65),z=rand(-65,65);let g=group(x,z);mesh(g,new THREE.BoxGeometry(.9,.66,1.6),animalMat,0,.65,0);mesh(g,new THREE.BoxGeometry(.55,.55,.62),animalMat,0,1.06,.9);for(let xx of [-.32,.32])for(let zz of [-.49,.49])mesh(g,new THREE.CylinderGeometry(.1,.1,.6,6),animalMat,xx,.22,zz);animals.push({g,x,z,tamed:false,phase:rand(0,10)})}
-const items=[['rope','Rope','🪢'],['wall','Wall','🧱'],['campfire','Fire','🔥'],['axe','Axe','🪓'],['pickaxe','Pickaxe','⛏️'],['wood','Wood','🪵'],['stone','Stone','🪨'],['fiber','Fiber','🌿'],['berries','Berries','🫐']];
-const inv={rope:1,wall:1,reinforced:0,spikes:0,campfire:1,axe:1,pickaxe:1,wood:4,stone:4,fiber:5,berries:3};
+for(let i=0;i<12;i++){
+  // The first animal is intentionally close to the starting campsite to test hunting immediately.
+  let x=i===0?2:rand(-65,65),z=i===0?19:rand(-65,65);
+  let g=group(x,z);
+  mesh(g,new THREE.BoxGeometry(.9,.66,1.6),animalMat,0,.65,0);
+  mesh(g,new THREE.BoxGeometry(.55,.55,.62),animalMat,0,1.06,.9);
+  for(let xx of [-.32,.32])for(let zz of [-.49,.49])mesh(g,new THREE.CylinderGeometry(.1,.1,.6,6),animalMat,xx,.22,zz);
+  animals.push({g,x,z,tamed:false,phase:rand(0,10),alive:true,hp:2});
+}
+const items=[['rope','Rope','🪢'],['wall','Wall','🧱'],['campfire','Fire','🔥'],['axe','Axe','🪓'],['pickaxe','Pickaxe','⛏️'],['wood','Wood','🪵'],['stone','Stone','🪨'],['fiber','Fiber','🌿'],['berries','Berries','🫐'],['raw_meat','Raw Meat','🥩'],['cooked_meat','Cooked Meat','🍖']];
+const inv={rope:1,wall:1,reinforced:0,spikes:0,campfire:1,axe:1,pickaxe:1,wood:4,stone:4,fiber:5,berries:3,raw_meat:0,cooked_meat:0};
+const food=createHuntingAndCooking(THREE,scene,mesh,mat,height,animals,inv,base,forest.campfirePosition);
 let buildChoice='wall';
 let selected=0,health=100,hunger=100,time=0,yaw=0,pitch=.45,drag=false,lastX=0,lastY=0;
 let jumpHeight=0,jumpVelocity=0; // The character's airborne height above the terrain.
@@ -59,7 +69,7 @@ const JUMP_SPEED=10.5,GRAVITY=25;
 function attemptJump(){
   // A real jump starts instantly on the ground, even if the last frame has not run yet.
   if(jumpHeight>0.001||jumpVelocity>0)return false;
-  if(!$('craft-backdrop').classList.contains('hidden')||!$('build-backdrop').classList.contains('hidden'))return false;
+  if(!$('craft-backdrop').classList.contains('hidden')||!$('build-backdrop').classList.contains('hidden')||!$('cook-backdrop').classList.contains('hidden'))return false;
   jumpVelocity=JUMP_SPEED;
   jumpHeight=.035;
   return true;
@@ -106,9 +116,14 @@ function attackEnemy(){
   if(time-lastAttackTime<.42)return;
   lastAttackTime=time;
   const selectedItem=items[selected][0];
-  const result=threats.attack(player,yaw,(inv[selectedItem]||0)>0?selectedItem:'');
-  if(result.hit)notify(result.message);
-  else if(!getDayNightInfo(time).isDay)notify('Move closer to a raider and face it to attack');
+  const weapon=(inv[selectedItem]||0)>0?selectedItem:'';
+  const enemyHit=threats.attack(player,yaw,weapon);
+  if(enemyHit.hit){notify(enemyHit.message);return;}
+  // If a cultist is not in range, the same attack button hunts nearby animals.
+  const animalHit=food.hunt(player,yaw,weapon);
+  if(animalHit.hit){notify(animalHit.message);return;}
+  if(weapon==='axe'||weapon==='pickaxe')notify(animalHit.reason);
+  else if(!getDayNightInfo(time).isDay)notify('Equip an axe to hunt animals or defend yourself');
 }
 function takeEnemyDamage(amount,attacker){
   health=Math.max(0,health-amount);
@@ -160,9 +175,25 @@ function updateUI(){
   $('base-count').textContent=base.structures.filter(item=>item.type!=='campfire').length+' DEFENSIVE STRUCTURES';
   const chosen=RECIPES.find(r=>r.id===buildChoice);
   $('blueprint-state').textContent='BUILD PLAN: '+(chosen?chosen.name.toUpperCase():'WOOD WALL')+' ('+(inv[buildChoice]||0)+' READY)';
-  const bar=$('hotbar');bar.innerHTML='';items.forEach(([id,n,emoji],i)=>{let b=document.createElement('button');b.className='slot'+(i===selected?' selected':'');b.innerHTML='<small>'+(i+1)+'</small><span>'+emoji+'</span><strong>'+n+'</strong><em>'+ (inv[id]||0)+'</em>';b.onclick=()=>{selected=i;if(id==='wall'||id==='campfire')buildChoice=id;updateUI()};bar.appendChild(b)});$('health-value').textContent=Math.floor(health);$('hunger-value').textContent=Math.floor(hunger);$('health-fill').style.width=health+'%';$('hunger-fill').style.width=hunger+'%';$('tamed-count').textContent=animals.filter(a=>a.tamed).length;Object.keys(goals).forEach(k=>{let el=document.querySelector('[data-goal="'+k+'"]');if(el)el.classList.toggle('complete',goals[k])});let done=Object.values(goals).filter(Boolean).length;$('quest-progress').textContent=done+' / 4';$('quest-progress-bar').style.width=done*25+'%'}
+  $('food-supplies').textContent='🥩 Raw '+(inv.raw_meat||0)+' · 🍖 Cooked '+(inv.cooked_meat||0);
+  const bar=$('hotbar');bar.innerHTML='';
+  items.forEach(([id,n,emoji],i)=>{
+    const button=document.createElement('button');
+    button.className='slot'+(i===selected?' selected':'');
+    const key=i<9?String(i+1):i===9?'0':'Q';
+    button.innerHTML='<small>'+key+'</small><span>'+emoji+'</span><strong>'+n+'</strong><em>'+(inv[id]||0)+'</em>';
+    button.onclick=()=>{selected=i;if(id==='wall'||id==='campfire')buildChoice=id;updateUI()};
+    bar.appendChild(button);
+  });$('health-value').textContent=Math.floor(health);$('hunger-value').textContent=Math.floor(hunger);$('health-fill').style.width=health+'%';$('hunger-fill').style.width=hunger+'%';$('tamed-count').textContent=animals.filter(a=>a.tamed).length;Object.keys(goals).forEach(k=>{let el=document.querySelector('[data-goal="'+k+'"]');if(el)el.classList.toggle('complete',goals[k])});let done=Object.values(goals).filter(Boolean).length;$('quest-progress').textContent=done+' / 4';$('quest-progress-bar').style.width=done*25+'%'}
 function gather(){let r=resources.filter(r=>r.ready&&dist(r.x,r.z)<3.5).sort((a,b)=>dist(a.x,a.z)-dist(b.x,b.z))[0];if(!r)return notify('Get closer to a tree, rock or bush');let id=r.type==='tree'?'wood':r.type==='rock'?'stone':'fiber';inv[id]=(inv[id]||0)+(r.type==='tree'?3:2);if(r.type==='bush')inv.berries++;r.ready=false;r.g.visible=false;setTimeout(()=>{r.ready=true;r.g.visible=true},20000);goals.gather=true;notify('Collected '+id);updateUI()}
-function tame(){let a=animals.filter(a=>!a.tamed&&dist(a.x,a.z)<4).sort((a,b)=>dist(a.x,a.z)-dist(b.x,b.z))[0];if(!a)return notify('Approach an untamed animal');if(!inv.rope)return notify('Craft a rope first');inv.rope--;a.tamed=true;goals.tame=true;notify('Animal tamed! It will follow you.');updateUI()}
+function tame(){
+  const nearby=animals.filter(a=>a.alive!==false&&!a.tamed&&dist(a.g.position.x,a.g.position.z)<4)
+    .sort((a,b)=>dist(a.g.position.x,a.g.position.z)-dist(b.g.position.x,b.g.position.z))[0];
+  if(!nearby)return notify('Approach a living wild animal to tame it');
+  if(!inv.rope)return notify('Craft a rope first');
+  inv.rope--;nearby.tamed=true;goals.tame=true;
+  notify('Animal tamed! It will follow you.');updateUI();
+}
 // Crafting takes place ONLY when the character stands near the world workbench.
 function renderRecipes(){
   const panel=$('craft-recipes');panel.innerHTML='';

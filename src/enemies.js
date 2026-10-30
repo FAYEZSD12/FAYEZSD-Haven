@@ -1,6 +1,6 @@
 // Original procedural nighttime threats for FAYEZSD's Haven.
 // The Stag Shadow cannot cross the CAMPFIRE sanctuary; cultist raiders CAN.
-export function createNightEnemies(THREE, scene, mesh, mat, height, camp) {
+export function createNightEnemies(THREE, scene, mesh, mat, height, camp, defenses=null) {
   const SAFE_RADIUS=9;
   const enemies=[];
   const dark=mat(0x222b2d),horn=mat(0x94836c),red= new THREE.MeshBasicMaterial({color:0xff5b48});
@@ -41,7 +41,7 @@ export function createNightEnemies(THREE, scene, mesh, mat, height, camp) {
     }
     const enemy={kind,root,visual,alive:true,hp:kind==='cultist'?3:Infinity,
       speed:kind==='stalker'?5.4:2.65+(index%3)*.25,
-      attackCooldown:1+index*.25,stagger:0,index};
+      attackCooldown:1+index*.25,wallCooldown:0,stagger:0,index};
     enemies.push(enemy);return enemy;
   }
   function despawn(){
@@ -79,6 +79,7 @@ export function createNightEnemies(THREE, scene, mesh, mat, height, camp) {
       if(!e.alive)continue;
       if(e.kind==='cultist')liveRaiders++;
       e.attackCooldown=Math.max(0,e.attackCooldown-dt);
+      e.wallCooldown=Math.max(0,e.wallCooldown-dt);
       e.stagger=Math.max(0,e.stagger-dt);
       const x=e.root.position.x,z=e.root.position.z,px=player.position.x,pz=player.position.z;
       const d=distance(x,z,px,pz);
@@ -105,7 +106,23 @@ export function createNightEnemies(THREE, scene, mesh, mat, height, camp) {
               nz=camp.z+cz/rad*(SAFE_RADIUS+.8);
             }
           }
-          positionAt(e,nx,nz);
+          // Camp-built barricades stop raiders. They chip away at the structure until it falls.
+          // Spiked panels also injure cultists on contact, giving your base real defensive value.
+          const blocker=defenses?.collidesAt(nx,nz,isStalker?.52:.37);
+          if(blocker){
+            if(e.wallCooldown<=0){
+              e.wallCooldown=isStalker?1.1:1.45;
+              const broken=defenses.damage(blocker,isStalker?20:11);
+              if(blocker.type==='spikes' && !isStalker){
+                e.hp-=1;
+                e.stagger=.45;
+                if(e.hp<=0){e.alive=false;scene.remove(e.root);}
+              }
+              if(broken)onAlert?.(blocker.type+' defense destroyed!');
+            }
+          }else{
+            positionAt(e,nx,nz);
+          }
         }
       }
       const dx=player.position.x-e.root.position.x,dz=player.position.z-e.root.position.z;

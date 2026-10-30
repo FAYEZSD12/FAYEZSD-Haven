@@ -93,6 +93,11 @@ export function createAvatar(THREE, scene, camera, mesh, mat, group) {
         mesh(g, new THREE.SphereGeometry(.135, 9, 7), berry, x, y, z);
       }
       mesh(g, new THREE.ConeGeometry(.14, .15, 6), leaves, 0, .54, 0);
+    } else if (type === 'raw_meat' || type === 'cooked_meat') {
+      const raw = new THREE.MeshStandardMaterial({color:0xba4953,roughness:.92});
+      const roasted = new THREE.MeshStandardMaterial({color:0x9d552d,roughness:.94});
+      mesh(g,new THREE.SphereGeometry(.29,11,8),type==='raw_meat'?raw:roasted,0,.29,0,1.25,.72,.88);
+      mesh(g,new THREE.SphereGeometry(.11,8,7),new THREE.MeshStandardMaterial({color:0xf5e6c5}),.25,.30,0);
     }
     return g;
   }

@@ -111,15 +111,17 @@ export function createAvatar(THREE, scene, camera, mesh, mat, group) {
     model.scale.setScalar(.87);
     firstHand.add(model);
   }
-  function animate(dt, moving, sprinting) {
-    if (moving) walkTime += dt * (sprinting ? 12 : 8);
-    const step = moving ? Math.sin(walkTime) * .62 : 0;
+  function animate(dt, moving, sprinting, airborne=false) {
+    if (moving && !airborne) walkTime += dt * (sprinting ? 12 : 8);
+    const step = moving && !airborne ? Math.sin(walkTime) * .62 : 0;
     const spring = (a, b) => THREE.MathUtils.damp(a, b, 13, dt);
-    leftLeg.rotation.x = spring(leftLeg.rotation.x, step);
-    rightLeg.rotation.x = spring(rightLeg.rotation.x, -step);
-    leftArm.rotation.x = spring(leftArm.rotation.x, -step * .72);
-    rightArm.rotation.x = spring(rightArm.rotation.x, step * .35 - .20);
+    // Bent knees and arms forward during a jump, smooth walking gait on the ground.
+    leftLeg.rotation.x = spring(leftLeg.rotation.x, airborne ? -.36 : step);
+    rightLeg.rotation.x = spring(rightLeg.rotation.x, airborne ? .27 : -step);
+    leftArm.rotation.x = spring(leftArm.rotation.x, airborne ? -.75 : -step * .72);
+    rightArm.rotation.x = spring(rightArm.rotation.x, airborne ? -.5 : step * .35 - .20);
     firstRig.rotation.z = spring(firstRig.rotation.z, moving ? Math.sin(walkTime) * .018 : 0);
+    firstRig.position.y = spring(firstRig.position.y, airborne ? -.45 : -.52);
   }
   function setFirstPerson(enabled) {
     player.visible = !enabled;

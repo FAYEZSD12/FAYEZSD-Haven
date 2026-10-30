@@ -125,6 +125,8 @@ export function createNightEnemies(THREE, scene, mesh, mat, height, camp, defens
           }
         }
       }
+      // Spiked defenses may have defeated this raider during movement.
+      if(!e.alive)continue;
       const dx=player.position.x-e.root.position.x,dz=player.position.z-e.root.position.z;
       e.root.rotation.y=Math.atan2(dx,dz);
       e.visual.position.y=Math.sin(elapsed*(isStalker?3.2:5.2)+e.index)*.075;

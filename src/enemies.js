@@ -171,17 +171,19 @@ export function createNightEnemies(THREE, scene, mesh, mat, height, camp, defens
       closestDistance:Number.isFinite(closest)?Math.ceil(closest):null
     };
   }
-  function attack(player,yaw,weapon){
-    const damage=weapon==='axe'?2:weapon==='pickaxe'?2:1;
-    // A forward-facing cone prevents hits behind the player.
+  function attack(player,yaw,weapon,shot=null){
+    const damage=shot?.damage ?? (weapon==='axe'||weapon==='pickaxe'?2:1);
+    const maxRange=shot?.range ?? 3.35;
+    const aim=shot?.accuracy ?? .30;
+    // Game targeting follows where the character is facing.
     const forwardX=Math.sin(yaw),forwardZ=Math.cos(yaw);
     let target=null,best=Infinity;
     for(const e of enemies){
       if(!e.alive)continue;
       const dx=e.root.position.x-player.position.x,dz=e.root.position.z-player.position.z;
       const d=Math.hypot(dx,dz);
-      if(d>3.35||d<.001||d>=best)continue;
-      if(dx/d*forwardX+dz/d*forwardZ<.30)continue;
+      if(d>maxRange||d<.001||d>=best)continue;
+      if(dx/d*forwardX+dz/d*forwardZ<aim)continue;
       target=e;best=d;
     }
     if(!target)return {hit:false,message:'No enemy in range'};

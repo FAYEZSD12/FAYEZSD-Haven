@@ -95,8 +95,7 @@ export function createForestMood(THREE, scene, mesh, mat, height, ground, grass,
     update(time) {
       // Start at sunrise. Transition between day, twilight and eerie blue night.
       const cycle=(time%250)/250;
-      const darkness=THREE.MathUtils.smoothstep(Math.sin(cycle*Math.PI*2-.7),-.05,.6);
-      const night=1-darkness;
+      const night=THREE.MathUtils.smoothstep(-Math.cos(cycle*Math.PI*2),.05,.75);
       currentColor.copy(dayColor).lerp(nightColor,night*.94);
       scene.background.copy(currentColor);
       scene.fog.color.copy(currentColor);

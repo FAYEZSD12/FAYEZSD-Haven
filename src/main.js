@@ -2,7 +2,8 @@ import * as THREE from 'three';
 import { createAvatar } from './avatar.js?v=0.5';
 import { createForestMood, getDayNightInfo } from './forest.js?v=0.6';
 import { createNightEnemies } from './enemies.js?v=0.9';
-import { createHuntingAndCooking } from './hunting.js?v=1.0';
+import { createHuntingAndCooking } from './hunting.js?v=1.1';
+import { FIREARMS,isFirearm,tryFire } from './weapons.js?v=1.1';
 import { RECIPES, BUILDABLE, STATISTICS, canAfford, craftRecipe, createBaseBuilding } from './building.js?v=0.8';
 const $=id=>document.getElementById(id);
 const scene=new THREE.Scene();scene.background=new THREE.Color(0xb9dce8);scene.fog=new THREE.Fog(0xb9dce8,55,155);
@@ -58,11 +59,11 @@ for(let i=0;i<12;i++){
   for(let xx of [-.32,.32])for(let zz of [-.49,.49])mesh(g,new THREE.CylinderGeometry(.1,.1,.6,6),animalMat,xx,.22,zz);
   animals.push({g,x,z,tamed:false,phase:rand(0,10),alive:true,hp:2});
 }
-const items=[['rope','Rope','🪢'],['wall','Wall','🧱'],['campfire','Fire','🔥'],['axe','Axe','🪓'],['pickaxe','Pickaxe','⛏️'],['wood','Wood','🪵'],['stone','Stone','🪨'],['fiber','Fiber','🌿'],['berries','Berries','🫐'],['raw_meat','Raw Meat','🥩'],['cooked_meat','Cooked Meat','🍖']];
-const inv={rope:1,wall:1,reinforced:0,spikes:0,campfire:1,axe:1,pickaxe:1,wood:4,stone:4,fiber:5,berries:3,raw_meat:0,cooked_meat:0};
+const items=[['rope','Rope','🪢'],['wall','Wall','🧱'],['campfire','Fire','🔥'],['axe','Axe','🪓'],['pickaxe','Pickaxe','⛏️'],['wood','Wood','🪵'],['stone','Stone','🪨'],['fiber','Fiber','🌿'],['berries','Berries','🫐'],['raw_meat','Raw Meat','🥩'],['cooked_meat','Cooked Meat','🍖'],['revolver','Revolver','🔫'],['rifle','Rifle','🔫'],['sniper','Sniper','🎯']];
+const inv={rope:1,wall:1,reinforced:0,spikes:0,campfire:1,axe:1,pickaxe:1,wood:4,stone:4,fiber:5,berries:3,raw_meat:0,cooked_meat:0,revolver:0,rifle:0,sniper:0,ammo:0};
 const food=createHuntingAndCooking(THREE,scene,mesh,mat,height,animals,inv,base,forest.campfirePosition);
 let buildChoice='wall';
-let selected=0,health=100,hunger=100,time=0,yaw=0,pitch=.45,drag=false,lastX=0,lastY=0;
+let selected=3,health=100,hunger=100,time=0,yaw=0,pitch=.45,drag=false,lastX=0,lastY=0; // Start with the axe equipped.
 let jumpHeight=0,jumpVelocity=0; // The character's airborne height above the terrain.
 let jumpHeld=false;
 const JUMP_SPEED=10.5,GRAVITY=25;
@@ -111,19 +112,54 @@ function zoomCamera(deltaY,deltaMode=0){
   if(zoomTarget!==0)pitch=Math.max(.08,pitch);
 }
 const keys=new Set(),goals={gather:false,craft:false,tame:false,build:false};
-let lastAttackTime=-10;
+let lastAttackTime=-10,lastShotTime=-10;
+function selectTool(id){
+  const slot=items.findIndex(x=>x[0]===id);
+  if(slot<0)return;
+  if((inv[id]||0)<1){notify('Craft '+(FIREARMS[id]?.name||id)+' at the workbench first.');return;}
+  selected=slot;updateUI();
+}
+function targetResource(tool,maxRange=4.15){
+  const candidates=resources.filter(r=>{
+    if(!r.ready)return false;
+    if(tool==='axe'&&!['tree','bush'].includes(r.type))return false;
+    if(tool==='pickaxe'&&r.type!=='rock')return false;
+    const dx=r.x-player.position.x,dz=r.z-player.position.z,d=Math.hypot(dx,dz);
+    if(d>maxRange||d<.001)return false;
+    return (dx*Math.sin(yaw)+dz*Math.cos(yaw))/d>-.05;
+  });
+  return candidates.sort((a,b)=>dist(a.x,a.z)-dist(b.x,b.z))[0]||null;
+}
 function attackEnemy(){
-  if(time-lastAttackTime<.42)return;
+  const weapon=items[selected]?.[0];
+  if((inv[weapon]||0)<1)return notify('Equip an available tool first. Your starter axe is on 4.');
+  if(isFirearm(weapon)){
+    const shot=tryFire(weapon,inv,time,lastShotTime);
+    if(!shot.ok){if(!shot.cooldown)notify(shot.message);return;}
+    lastShotTime=time;
+    let hit=threats.attack(player,yaw,weapon,shot);
+    if(!hit.hit)hit=food.hunt(player,yaw,weapon,shot);
+    notify(hit.hit?hit.message:shot.name+' fired! Face an animal or cultist to hit it.');
+    updateUI();
+    return;
+  }
+  if(time-lastAttackTime<.28)return;
   lastAttackTime=time;
-  const selectedItem=items[selected][0];
-  const weapon=(inv[selectedItem]||0)>0?selectedItem:'';
   const enemyHit=threats.attack(player,yaw,weapon);
   if(enemyHit.hit){notify(enemyHit.message);return;}
-  // If a cultist is not in range, the same attack button hunts nearby animals.
-  const animalHit=food.hunt(player,yaw,weapon);
-  if(animalHit.hit){notify(animalHit.message);return;}
-  if(weapon==='axe'||weapon==='pickaxe')notify(animalHit.reason);
-  else if(!getDayNightInfo(time).isDay)notify('Equip an axe to hunt animals or defend yourself');
+  if(weapon==='axe'||weapon==='pickaxe'){
+    const resource=targetResource(weapon);
+    const animal=food.closestWildAnimal(player,yaw,4.2);
+    if(resource&&(!animal||dist(resource.x,resource.z)<dist(animal.g.position.x,animal.g.position.z))){
+      gather(resource);return;
+    }
+    const animalHit=food.hunt(player,yaw,weapon);
+    if(animalHit.hit){notify(animalHit.message);return;}
+    if(resource){gather(resource);return;}
+    notify('Get close and face a '+(weapon==='axe'?'tree or animal':'rock or animal')+' to use your '+weapon+'.');
+    return;
+  }
+  notify('Use axe (4) for trees/animals, pickaxe (5) for rocks, or Z / X / H for guns.');
 }
 function takeEnemyDamage(amount,attacker){
   health=Math.max(0,health-amount);
@@ -180,12 +216,33 @@ function updateUI(){
   items.forEach(([id,n,emoji],i)=>{
     const button=document.createElement('button');
     button.className='slot'+(i===selected?' selected':'');
-    const key=i<9?String(i+1):i===9?'0':'Q';
+    const key=i<9?String(i+1):i===9?'0':i===10?'Q':FIREARMS[id]?.key||'?';
     button.innerHTML='<small>'+key+'</small><span>'+emoji+'</span><strong>'+n+'</strong><em>'+(inv[id]||0)+'</em>';
     button.onclick=()=>{selected=i;if(id==='wall'||id==='campfire')buildChoice=id;updateUI()};
     bar.appendChild(button);
-  });$('health-value').textContent=Math.floor(health);$('hunger-value').textContent=Math.floor(hunger);$('health-fill').style.width=health+'%';$('hunger-fill').style.width=hunger+'%';$('tamed-count').textContent=animals.filter(a=>a.tamed).length;Object.keys(goals).forEach(k=>{let el=document.querySelector('[data-goal="'+k+'"]');if(el)el.classList.toggle('complete',goals[k])});let done=Object.values(goals).filter(Boolean).length;$('quest-progress').textContent=done+' / 4';$('quest-progress-bar').style.width=done*25+'%'}
-function gather(){let r=resources.filter(r=>r.ready&&dist(r.x,r.z)<3.5).sort((a,b)=>dist(a.x,a.z)-dist(b.x,b.z))[0];if(!r)return notify('Get closer to a tree, rock or bush');let id=r.type==='tree'?'wood':r.type==='rock'?'stone':'fiber';inv[id]=(inv[id]||0)+(r.type==='tree'?3:2);if(r.type==='bush')inv.berries++;r.ready=false;r.g.visible=false;setTimeout(()=>{r.ready=true;r.g.visible=true},20000);goals.gather=true;notify('Collected '+id);updateUI()}
+  });
+  const guns=$('gun-buttons');guns.innerHTML='';
+  for(const [id,info] of Object.entries(FIREARMS)){
+    const btn=document.createElement('button');
+    btn.className='gun-choice'+(items[selected]?.[0]===id?' selected':'');
+    btn.title=info.name+' (press '+info.key+')';
+    btn.innerHTML='<strong>'+info.key+'</strong> '+info.name+' <small>'+(inv[id]||0)+'</small>';
+    btn.onclick=()=>selectTool(id);
+    guns.appendChild(btn);
+  }
+  $('ammo-status').textContent='📦 AMMO: '+(inv.ammo||0);
+  $('health-value').textContent=Math.floor(health);$('hunger-value').textContent=Math.floor(hunger);$('health-fill').style.width=health+'%';$('hunger-fill').style.width=hunger+'%';$('tamed-count').textContent=animals.filter(a=>a.tamed).length;Object.keys(goals).forEach(k=>{let el=document.querySelector('[data-goal="'+k+'"]');if(el)el.classList.toggle('complete',goals[k])});let done=Object.values(goals).filter(Boolean).length;$('quest-progress').textContent=done+' / 4';$('quest-progress-bar').style.width=done*25+'%'}
+function gather(target=null){
+  const r=target||resources.filter(r=>r.ready&&dist(r.x,r.z)<3.5).sort((a,b)=>dist(a.x,a.z)-dist(b.x,b.z))[0];
+  if(!r||!r.ready){notify('Move closer to a tree, rock or bush');return false;}
+  const id=r.type==='tree'?'wood':r.type==='rock'?'stone':'fiber';
+  inv[id]=(inv[id]||0)+(r.type==='tree'?3:2);
+  if(r.type==='bush')inv.berries++;
+  r.ready=false;r.g.visible=false;
+  setTimeout(()=>{r.ready=true;r.g.visible=true},20000);
+  goals.gather=true;
+  notify('Collected '+(r.type==='tree'?3:2)+' '+id+'!');updateUI();return true;
+}
 function tame(){
   const nearby=animals.filter(a=>a.alive!==false&&!a.tamed&&dist(a.g.position.x,a.g.position.z)<4)
     .sort((a,b)=>dist(a.g.position.x,a.g.position.z)-dist(b.g.position.x,b.g.position.z))[0];
@@ -212,7 +269,8 @@ function renderRecipes(){
       if(!craftRecipe(recipe,inv)){notify('Gather more supplies first');renderRecipes();return;}
       goals.craft=true;
       if(BUILDABLE.includes(recipe.id))buildChoice=recipe.id;
-      notify(recipe.name+' crafted!'+(BUILDABLE.includes(recipe.id)?' Press B to place it.':''));
+      if(isFirearm(recipe.id))selected=items.findIndex(item=>item[0]===recipe.id);
+      notify(recipe.name+' crafted!'+(isFirearm(recipe.id)?' Includes 6 rounds. Press '+FIREARMS[recipe.id].key+' or click its button.':recipe.id==='ammo'?' +8 rounds.':BUILDABLE.includes(recipe.id)?' Press B to place it.':''));
       updateUI();renderRecipes();
     };
     panel.appendChild(button);
@@ -305,7 +363,7 @@ function eatFood(item=''){
 function save(){
   try{
     localStorage.setItem('fayez-haven-v1',JSON.stringify({
-      inv,health,hunger,time,goals,x:player.position.x,z:player.position.z,
+      inv,selected,starterAxeGiven:true,health,hunger,time,goals,x:player.position.x,z:player.position.z,
       structures:base.exportStructures(),buildChoice,
       hunting:food.saveState(),
       tamed:animals.map((a,i)=>a.tamed&&a.alive!==false?i:null).filter(x=>x!==null)
@@ -318,6 +376,8 @@ function load(){
     const saved=JSON.parse(localStorage.getItem('fayez-haven-v1')||'null');
     if(!saved)return;
     Object.assign(inv,saved.inv||{});
+    if(!saved.starterAxeGiven)inv.axe=Math.max(1,inv.axe||0);
+    if(Number.isInteger(saved.selected)&&saved.selected>=0&&saved.selected<items.length)selected=saved.selected;
     Object.assign(goals,saved.goals||{});
     health=saved.health??100;hunger=saved.hunger??100;time=saved.time||0;
     player.position.x=saved.x??player.position.x;
@@ -352,6 +412,9 @@ window.addEventListener('keydown',e=>{
   if(/^Digit[1-9]$/.test(code)){selected=+code.slice(-1)-1;updateUI()}
   if(code==='Digit0'){selected=9;updateUI()}
   if(code==='KeyQ'){selected=10;updateUI()}
+  if(code==='KeyZ')selectTool('revolver');
+  if(code==='KeyX')selectTool('rifle');
+  if(code==='KeyH')selectTool('sniper');
   if(code==='KeyE'){
     if(base.nearTable(player))craft();
     else if(food.canCook(player))cookingMenu();

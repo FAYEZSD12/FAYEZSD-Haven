@@ -42,6 +42,10 @@ function resource(type,x,z){
   resources.push({type,g,x,z,ready:true});
 }
 for(let i=0;i<115;i++){let x=rand(-104,104),z=rand(-104,104);if(Math.hypot(x,z)<10||Math.hypot(x,z-13)<11)continue;resource(i%6===0?'rock':i%5===0?'bush':'tree',x,z)}
+// Reliable first-play targets: accessible tree, stone and bush just beyond the camp clearing.
+resource('tree',2,27);
+resource('rock',6,27);
+resource('bush',-2,26);
 const grass=new THREE.InstancedMesh(new THREE.ConeGeometry(.1,.65,3),mat(0x44844d),1200),dummy=new THREE.Object3D();for(let i=0;i<1200;i++){let x=rand(-105,105),z=rand(-105,105);dummy.position.set(x,height(x,z)+.32,z);dummy.rotation.y=rand(0,6.3);dummy.scale.setScalar(Math.hypot(x,z-13)<8?.001:rand(.6,1.5));dummy.updateMatrix();grass.setMatrixAt(i,dummy.matrix)}scene.add(grass);
 const forest=createForestMood(THREE,scene,mesh,mat,height,ground,grass,sun,hemisphere);
 const avatar=createAvatar(THREE,scene,camera,mesh,mat,group);

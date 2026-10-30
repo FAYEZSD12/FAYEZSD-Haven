@@ -250,7 +250,7 @@ function buildMenu(force){
   $('craft-backdrop').classList.add('hidden');modal.classList.remove('hidden');renderBuildMenu();
 }
 function build(){
-  if(!$('craft-backdrop').classList.contains('hidden')||!$('build-backdrop').classList.contains('hidden'))return;
+  if(!$('craft-backdrop').classList.contains('hidden')||!$('build-backdrop').classList.contains('hidden')||!$('cook-backdrop').classList.contains('hidden'))return;
   const type=buildChoice;
   if((inv[type]||0)<1)return notify('You need a crafted '+type+' kit. Use the camp workbench first.');
   const result=base.place(type,player,yaw);
@@ -260,12 +260,55 @@ function build(){
   notify('Placed '+RECIPES.find(r=>r.id===type).name+'! Defenses block cultists until destroyed.');
   updateUI();
 }
+// The same cooking station can be used at the original campfire or player-built campfires.
+function showCookingStatus(){
+  const info=food.cookInfo();
+  $('cook-raw-count').textContent=info.raw;
+  $('cook-cooked-count').textContent=info.cooked;
+  $('cook-add').disabled=info.active||info.raw<1;
+  $('cook-eat').disabled=info.cooked<1;
+  $('cooking-progress').style.width=(info.active?(100*(1-info.remaining/info.duration)):0).toFixed(1)+'%';
+  $('cooking-status').textContent=info.active
+    ?'🔥 Cooking meat... '+info.remaining.toFixed(1)+' seconds remaining'
+    :info.cooked>0?'🍖 Meat is ready! Eat it without losing health.':'🔥 Campfire is ready. Add 1 raw meat to start.';
+}
+function cookingMenu(force){
+  const modal=$('cook-backdrop');
+  if(force===false){modal.classList.add('hidden');return;}
+  if(!modal.classList.contains('hidden')){modal.classList.add('hidden');return;}
+  if(!food.canCook(player))return notify('Approach the central campfire or a placed campfire to cook meat.');
+  $('craft-backdrop').classList.add('hidden');
+  $('build-backdrop').classList.add('hidden');
+  modal.classList.remove('hidden');
+  showCookingStatus();
+}
+function cookRawMeat(){
+  const result=food.startCooking(player);
+  notify(result.message);showCookingStatus();updateUI();
+}
+function eatFood(item=''){
+  const preferred=item||((items[selected]?.[0]==='raw_meat'||items[selected]?.[0]==='cooked_meat')?items[selected][0]:'');
+  if(preferred==='raw_meat'||preferred==='cooked_meat'){
+    const outcome=food.eat(preferred);
+    if(!outcome.ok)return notify(outcome.message);
+    hunger=Math.min(100,hunger+outcome.hunger);
+    health=Math.max(0,health+outcome.health);
+    notify(outcome.message);updateUI();showCookingStatus();return;
+  }
+  if((inv.cooked_meat||0)>0)return eatFood('cooked_meat');
+  if((inv.berries||0)>0){
+    inv.berries--;hunger=Math.min(100,hunger+22);
+    notify('Ate berries: +22 hunger');updateUI();return;
+  }
+  notify('No food! Hunt an animal and cook its raw meat by the campfire.');
+}
 function save(){
   try{
     localStorage.setItem('fayez-haven-v1',JSON.stringify({
       inv,health,hunger,time,goals,x:player.position.x,z:player.position.z,
       structures:base.exportStructures(),buildChoice,
-      tamed:animals.map((a,i)=>a.tamed?i:null).filter(x=>x!==null)
+      hunting:food.saveState(),
+      tamed:animals.map((a,i)=>a.tamed&&a.alive!==false?i:null).filter(x=>x!==null)
     }));
     notify('Game and defenses saved in this browser');
   }catch(e){notify('Save unavailable in this browser');}
@@ -281,7 +324,8 @@ function load(){
     player.position.z=saved.z??player.position.z;
     if(BUILDABLE.includes(saved.buildChoice))buildChoice=saved.buildChoice;
     base.restore(saved.structures);
-    for(const i of (saved.tamed||[]))if(animals[i])animals[i].tamed=true;
+    food.restoreState(saved.hunting);
+    for(const i of (saved.tamed||[]))if(animals[i]&&animals[i].alive!==false)animals[i].tamed=true;
     notify('Previous save and defenses loaded');
   }catch(e){console.warn(e);}
 }
@@ -291,6 +335,9 @@ $('craft-close').onclick=()=>craft(false);
 $('build-toggle').onclick=()=>buildMenu();
 $('build-close').onclick=()=>buildMenu(false);
 $('night-test-btn').onclick=skipToNightForTesting;
+$('cook-close').onclick=()=>cookingMenu(false);
+$('cook-add').onclick=cookRawMeat;
+$('cook-eat').onclick=()=>eatFood('cooked_meat');
 // Global keyboard handling (including while the hotbar or HUD has focus).
 window.addEventListener('keydown',e=>{
   const code=e.code||(e.key===' '?'Space':e.key);
@@ -303,7 +350,13 @@ window.addEventListener('keydown',e=>{
   }
   if(e.repeat)return;
   if(/^Digit[1-9]$/.test(code)){selected=+code.slice(-1)-1;updateUI()}
-  if(code==='KeyE'){if(base.nearTable(player))craft();else gather();}
+  if(code==='Digit0'){selected=9;updateUI()}
+  if(code==='KeyQ'){selected=10;updateUI()}
+  if(code==='KeyE'){
+    if(base.nearTable(player))craft();
+    else if(food.canCook(player))cookingMenu();
+    else gather();
+  }
   if(code==='KeyT')tame();
   if(code==='KeyB')build();
   if(code==='KeyC')craft();
@@ -318,7 +371,7 @@ window.addEventListener('keydown',e=>{
       if(document.pointerLockElement===renderer.domElement)document.exitPointerLock?.();
     }
   }
-  if(code==='KeyF'&&inv.berries>0){inv.berries--;hunger=Math.min(100,hunger+22);notify('Ate berries');updateUI()}
+  if(code==='KeyF')eatFood()
 },{capture:true});
 window.addEventListener('keyup',e=>{
   const code=e.code||(e.key===' '?'Space':e.key);
@@ -356,7 +409,7 @@ window.addEventListener('pointermove',e=>{
 });
 // Listen on WINDOW, including when the cursor is over the HUD instead of the 3D canvas.
 window.addEventListener('wheel',e=>{
-  if(!$('craft-backdrop').classList.contains('hidden')||!$('build-backdrop').classList.contains('hidden'))return;
+  if(!$('craft-backdrop').classList.contains('hidden')||!$('build-backdrop').classList.contains('hidden')||!$('cook-backdrop').classList.contains('hidden'))return;
   e.preventDefault();
   zoomCamera(e.deltaY,e.deltaMode);
 },{passive:false,capture:true});
@@ -392,7 +445,22 @@ forest.update(time);
 const phase=getDayNightInfo(time);
 const enemyStatus=threats.update(dt,phase,player,takeEnemyDamage,notify);
 updateThreatUI(phase,enemyStatus);
-for(const a of animals){a.phase+=dt;if(a.tamed){let dx=player.position.x-a.g.position.x,dz=player.position.z-a.g.position.z,d=Math.hypot(dx,dz);if(d>3){a.g.position.x+=dx/d*dt*3;a.g.position.z+=dz/d*dt*3}}else{a.g.position.x+=Math.sin(a.phase)*dt*.25;a.g.position.z+=Math.cos(a.phase*.7)*dt*.25}a.g.position.y=height(a.g.position.x,a.g.position.z)}
+for(const a of animals){
+  if(a.alive===false)continue; // A hunted animal cannot move, be tamed, or reappear.
+  a.phase+=dt;
+  if(a.tamed){
+    const dx=player.position.x-a.g.position.x,dz=player.position.z-a.g.position.z,d=Math.hypot(dx,dz);
+    if(d>3){a.g.position.x+=dx/d*dt*3;a.g.position.z+=dz/d*dt*3}
+  }else{
+    a.g.position.x+=Math.sin(a.phase)*dt*.25;
+    a.g.position.z+=Math.cos(a.phase*.7)*dt*.25;
+  }
+  a.g.position.y=height(a.g.position.x,a.g.position.z);
+}
+const collectedMeat=food.updateDrops(dt,time,player);
+if(collectedMeat>0){notify('Collected '+collectedMeat+' raw meat! Go to campfire to cook it.');updateUI();}
+if(food.updateCooking(dt)){notify('🍖 Meat finished cooking! Eat it with F or at the campfire.');updateUI();}
+if(!$('cook-backdrop').classList.contains('hidden'))showCookingStatus();
 // Smooth camera zoom. Hide the avatar inside first person so the head does not obstruct the view.
 zoomCurrent=THREE.MathUtils.damp(zoomCurrent,zoomTarget,14,dt);
 const firstPerson=zoomCurrent<.45;
@@ -411,10 +479,14 @@ if(firstPerson){
 showClock();
 const near=resources.find(r=>r.ready&&dist(r.x,r.z)<3.5);
 const nearWorkstation=base.nearTable(player);
-$('interaction').classList.toggle('hidden',!near&&!nearWorkstation);
+const nearFire=food.canCook(player);
+$('interaction').classList.toggle('hidden',!near&&!nearWorkstation&&!nearFire);
 if(nearWorkstation){
   $('interaction-title').textContent='Use Crafting Table';
   $('interaction-hint').textContent='Press E or C to craft using your supplies';
+}else if(nearFire){
+  $('interaction-title').textContent='Cook Meat at Campfire';
+  $('interaction-hint').textContent='Press E • raw '+(inv.raw_meat||0)+' / cooked '+(inv.cooked_meat||0);
 }else if(near){
   $('interaction-title').textContent='Gather '+near.type;
   $('interaction-hint').textContent='Press E to collect resources';

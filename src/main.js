@@ -22,7 +22,21 @@ for(let i=0;i<12;i++){let x=rand(-65,65),z=rand(-65,65);let g=group(x,z);mesh(g,
 const items=[['rope','Rope','🪢'],['wall','Wall','🧱'],['campfire','Fire','🔥'],['axe','Axe','🪓'],['pickaxe','Pickaxe','⛏️'],['wood','Wood','🪵'],['stone','Stone','🪨'],['fiber','Fiber','🌿'],['berries','Berries','🫐']];
 const inv={rope:1,wall:1,campfire:1,axe:1,pickaxe:1,wood:4,stone:4,fiber:5,berries:3},recipes=[['rope',{fiber:3}],['wall',{wood:4}],['campfire',{wood:2,stone:4}],['axe',{wood:2,stone:2}],['pickaxe',{wood:2,stone:3}]];
 let selected=0,health=100,hunger=100,time=0,yaw=0,pitch=.45,drag=false,lastX=0,lastY=0;
-let zoomTarget=9,zoomCurrent=9; // Camera distance: 0 = first person, up to 18 = zoomed out.
+let zoomTarget=9,zoomCurrent=9; // Camera distance 0 = first person, 18 = zoomed out.
+const clampCameraDistance=value=>THREE.MathUtils.clamp(value,0,18);
+function zoomCamera(deltaY,deltaMode=0){
+  // Normalize mice and trackpads. Positive delta zooms OUT; negative zooms IN.
+  const pixels=deltaY*(deltaMode===1?16:deltaMode===2?innerHeight:1);
+  if(!Number.isFinite(pixels)||Math.abs(pixels)<.01)return;
+  const step=Math.min(3,Math.max(.75,Math.abs(pixels)/85));
+  if(pixels>0 && zoomTarget===0){
+    zoomTarget=2; // The first scroll away from first person must actually exit it.
+  }else{
+    zoomTarget=clampCameraDistance(zoomTarget+Math.sign(pixels)*step);
+    if(zoomTarget<.85)zoomTarget=0; // Snap to a true first-person view.
+  }
+  if(zoomTarget!==0)pitch=Math.max(.08,pitch);
+}
 const keys=new Set(),goals={gather:false,craft:false,tame:false,build:false};
 function notify(msg){$('toast').textContent=msg;$('toast').classList.add('show');clearTimeout(notify.timer);notify.timer=setTimeout(()=>$('toast').classList.remove('show'),2500)}
 function dist(x,z){return Math.hypot(player.position.x-x,player.position.z-z)}
@@ -35,26 +49,58 @@ function craft(){const modal=$('craft-backdrop');modal.classList.toggle('hidden'
 function save(){try{localStorage.setItem('fayez-haven-v1',JSON.stringify({inv,health,hunger,time,goals,x:player.position.x,z:player.position.z,structures, tamed:animals.map((a,i)=>a.tamed?i:null).filter(x=>x!==null)}));notify('Game saved in this browser')}catch(e){notify('Save unavailable in this browser')}}
 function load(){try{let s=JSON.parse(localStorage.getItem('fayez-haven-v1')||'null');if(!s)return;Object.assign(inv,s.inv||{});Object.assign(goals,s.goals||{});health=s.health??100;hunger=s.hunger??100;time=s.time||0;player.position.x=s.x||0;player.position.z=s.z||0;for(let i of (s.tamed||[]))if(animals[i])animals[i].tamed=true;notify('Previous save loaded')}catch(e){console.warn(e)}}
 $('save-btn').onclick=save;$('craft-toggle').onclick=craft;$('craft-close').onclick=craft;
-window.addEventListener('keydown',e=>{if(['KeyW','KeyA','KeyS','KeyD','ShiftLeft','Space'].includes(e.code))e.preventDefault();keys.add(e.code);if(e.repeat)return;if(/^Digit[1-9]$/.test(e.code)){selected=+e.code.slice(-1)-1;updateUI()}if(e.code==='KeyE')gather();if(e.code==='KeyT')tame();if(e.code==='KeyB')build();if(e.code==='KeyC')craft();if(e.code==='KeyF'){if(inv.berries>0){inv.berries--;hunger=Math.min(100,hunger+22);notify('Ate berries');updateUI()}}});
+window.addEventListener('keydown',e=>{if(['KeyW','KeyA','KeyS','KeyD','ShiftLeft','Space'].includes(e.code))e.preventDefault();keys.add(e.code);if(e.repeat)return;if(/^Digit[1-9]$/.test(e.code)){selected=+e.code.slice(-1)-1;updateUI()}if(e.code==='KeyE')gather();if(e.code==='KeyT')tame();if(e.code==='KeyB')build();if(e.code==='KeyC')craft();if(e.code==='KeyV'){zoomTarget=zoomTarget===0?9:0;if(zoomTarget!==0){pitch=Math.max(.08,pitch);if(document.pointerLockElement===renderer.domElement)document.exitPointerLock?.()}}if(e.code==='KeyF'){if(inv.berries>0){inv.berries--;hunger=Math.min(100,hunger+22);notify('Ate berries');updateUI()}}});
 window.addEventListener('keyup',e=>keys.delete(e.code));
-renderer.domElement.addEventListener('pointerdown',e=>{drag=true;lastX=e.clientX;lastY=e.clientY});window.addEventListener('pointerup',()=>drag=false);window.addEventListener('pointermove',e=>{if(!drag)return;yaw-=(e.clientX-lastX)*.005;pitch=THREE.MathUtils.clamp(pitch+(e.clientY-lastY)*.004,zoomTarget<.8?-1.2:.08,1.2);lastX=e.clientX;lastY=e.clientY});
-// Mouse wheel zooms the camera like Roblox. The nearest zoom level switches to first-person view.
-renderer.domElement.addEventListener('wheel',e=>{
+// Camera input: drag in third-person or first-person; click in first-person to lock the mouse.
+renderer.domElement.addEventListener('pointerdown',e=>{
+  if(e.button!==0&&e.button!==2)return;
+  drag=true;lastX=e.clientX;lastY=e.clientY;
+  if(zoomTarget===0 && e.button===0 && document.pointerLockElement!==renderer.domElement){
+    renderer.domElement.requestPointerLock?.()?.catch?.(()=>{});
+  }
+});
+renderer.domElement.addEventListener('contextmenu',e=>e.preventDefault());
+window.addEventListener('pointerup',()=>drag=false);
+window.addEventListener('pointermove',e=>{
+  if(document.pointerLockElement===renderer.domElement){
+    yaw-=e.movementX*.004;
+    pitch=THREE.MathUtils.clamp(pitch+e.movementY*.004,-1.22,1.2);
+    return;
+  }
+  if(!drag)return;
+  yaw-=(e.clientX-lastX)*.005;
+  pitch=THREE.MathUtils.clamp(pitch+(e.clientY-lastY)*.004,zoomTarget===0?-1.22:.08,1.2);
+  lastX=e.clientX;lastY=e.clientY;
+});
+// Listen on WINDOW, including when the cursor is over the HUD instead of the 3D canvas.
+window.addEventListener('wheel',e=>{
+  if(!$('craft-backdrop').classList.contains('hidden'))return;
   e.preventDefault();
-  const pixels=e.deltaY*(e.deltaMode===1?16:e.deltaMode===2?innerHeight:1);
-  const step=Math.min(2.5,Math.max(.15,Math.abs(pixels)/100));
-  zoomTarget=THREE.MathUtils.clamp(zoomTarget+Math.sign(pixels)*step,0,18);
-  if(zoomTarget>=.8)pitch=Math.max(.08,pitch);
-},{passive:false});
+  zoomCamera(e.deltaY,e.deltaMode);
+},{passive:false,capture:true});
 addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)});
 load();updateUI();let prev=performance.now();
 function animate(now){requestAnimationFrame(animate);const dt=Math.min((now-prev)/1000,.05);prev=now;time+=dt;hunger=Math.max(0,hunger-dt*.06);if(hunger===0)health=Math.max(0,health-dt*.25);
-let forward=(keys.has('KeyW')?1:0)-(keys.has('KeyS')?1:0),right=(keys.has('KeyD')?1:0)-(keys.has('KeyA')?1:0);let len=Math.hypot(forward,right);if(len){forward/=len;right/=len;let speed=keys.has('ShiftLeft')?9:5.5;player.position.x=THREE.MathUtils.clamp(player.position.x+(Math.sin(yaw)*forward-Math.cos(yaw)*right)*speed*dt,-108,108);player.position.z=THREE.MathUtils.clamp(player.position.z+(Math.cos(yaw)*forward+Math.sin(yaw)*right)*speed*dt,-108,108);player.rotation.y=yaw}player.position.y=height(player.position.x,player.position.z);
+// Movement uses the same camera basis as the view: D points screen-right, A screen-left.
+let forward=(keys.has('KeyW')?1:0)-(keys.has('KeyS')?1:0);
+let strafe=(keys.has('KeyD')?1:0)-(keys.has('KeyA')?1:0);
+const len=Math.hypot(forward,strafe);
+if(len){
+  forward/=len;strafe/=len;
+  const speed=keys.has('ShiftLeft')?9:5.5;
+  const facingX=Math.sin(yaw),facingZ=Math.cos(yaw);
+  const cameraRightX=-facingZ,cameraRightZ=facingX;
+  player.position.x=THREE.MathUtils.clamp(player.position.x+(facingX*forward+cameraRightX*strafe)*speed*dt,-108,108);
+  player.position.z=THREE.MathUtils.clamp(player.position.z+(facingZ*forward+cameraRightZ*strafe)*speed*dt,-108,108);
+  player.rotation.y=yaw;
+}
+player.position.y=height(player.position.x,player.position.z);
 for(const a of animals){a.phase+=dt;if(a.tamed){let dx=player.position.x-a.g.position.x,dz=player.position.z-a.g.position.z,d=Math.hypot(dx,dz);if(d>3){a.g.position.x+=dx/d*dt*3;a.g.position.z+=dz/d*dt*3}}else{a.g.position.x+=Math.sin(a.phase)*dt*.25;a.g.position.z+=Math.cos(a.phase*.7)*dt*.25}a.g.position.y=height(a.g.position.x,a.g.position.z)}
 // Smooth camera zoom. Hide the avatar inside first person so the head does not obstruct the view.
-zoomCurrent=THREE.MathUtils.damp(zoomCurrent,zoomTarget,12,dt);
-const firstPerson=zoomCurrent<.65;
+zoomCurrent=THREE.MathUtils.damp(zoomCurrent,zoomTarget,14,dt);
+const firstPerson=zoomCurrent<.45;
 player.visible=!firstPerson;
+if(zoomTarget!==0 && document.pointerLockElement===renderer.domElement)document.exitPointerLock?.();
 const target=player.position.clone().add(new THREE.Vector3(0,1.85,0));
 if(firstPerson){
   camera.position.copy(target);
@@ -62,10 +108,10 @@ if(firstPerson){
   camera.lookAt(target.clone().add(look));
 }else{
   const offset=new THREE.Vector3(-Math.sin(yaw)*Math.cos(pitch)*zoomCurrent,Math.sin(pitch)*zoomCurrent,-Math.cos(yaw)*Math.cos(pitch)*zoomCurrent);
-  camera.position.lerp(target.clone().add(offset),.2);
+  camera.position.lerp(target.clone().add(offset),.24);
   camera.lookAt(target);
 }
-$('day-readout').textContent='DAY '+String(Math.floor(time/250)+1).padStart(2,'0')+' · '+(time%250<125?'MORNING':'EVENING');
+$('day-readout').textContent='DAY '+String(Math.floor(time/250)+1).padStart(2,'0')+' · '+(time%250<125?'MORNING':'EVENING')+' · '+(firstPerson?'FIRST PERSON':'THIRD PERSON');
 const near=resources.find(r=>r.ready&&dist(r.x,r.z)<3.5);$('interaction').classList.toggle('hidden',!near);if(near){$('interaction-title').textContent='Gather '+near.type;$('interaction-hint').textContent='Press E to collect resources'}
 if(Math.floor(now/350)!==Math.floor((now-dt*1000)/350))updateUI();renderer.render(scene,camera)}
 requestAnimationFrame(animate);

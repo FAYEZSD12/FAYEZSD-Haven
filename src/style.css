@@ -129,3 +129,27 @@
 .hotbar{overflow-x:auto;overflow-y:hidden;scrollbar-width:thin;scrollbar-color:#8db89c55 transparent}
 .hotbar .slot{flex:0 0 auto}
 @media(max-width:750px){.hotbar{width:calc(100vw - 22px);max-width:calc(100vw - 22px);justify-content:flex-start}.cook-inventory{gap:6px}.cook-inventory>div{padding:10px 9px}.cook-inventory span{font-size:10px}}
+
+
+/* v1.1 compact click-to-equip firearm controls, independent of the inventory scroll. */
+.weapon-quickbar{
+  position:absolute;left:50%;transform:translateX(-50%);bottom:111px;
+  padding:8px 12px;z-index:3;display:flex;align-items:center;justify-content:center;
+  gap:7px;pointer-events:auto;max-width:calc(100vw - 20px);width:max-content;
+  background:rgba(12,32,29,.93);
+}
+.weapon-quickbar-title{font-size:10px;font-weight:900;letter-spacing:1.1px;color:#f8dba5}
+.gun-buttons{display:flex;gap:6px}
+.gun-choice{background:#243e38;color:#e5ece4;border:1px solid #6d927b70;border-radius:7px;
+  padding:8px 10px;font-size:11px;font-weight:700;white-space:nowrap}
+.gun-choice strong{display:inline-grid;place-items:center;width:20px;height:21px;margin-right:4px;
+  border-radius:4px;background:#aab99237;color:#ffe4a6}
+.gun-choice small{color:#e6cdab;margin-left:4px}
+.gun-choice:hover{background:#3a6450;border-color:#dfce99}
+.gun-choice.selected{background:#72583f;border-color:#edc17b;box-shadow:0 0 8px #e9ac5460}
+.ammo-status{font-weight:900;font-size:10px;white-space:nowrap;color:#ffdda2;
+ background:#633c2c8c;border-radius:6px;padding:9px}
+@media(max-width:850px){.weapon-quickbar{bottom:80px;padding:6px}.weapon-quickbar-title{display:none}
+ .gun-choice{padding:6px;font-size:10px}.ammo-status{font-size:9px;padding:7px}}
+@media(max-width:600px){.weapon-quickbar{bottom:76px;gap:3px}.gun-buttons{gap:3px}
+ .gun-choice{padding:5px;font-size:9px}.gun-choice small{display:none}.ammo-status{font-size:8px}}

@@ -59,3 +59,33 @@
 .attack-button:active{transform:scale(.94)}
 @media(max-width:950px){.attack-button{bottom:183px;right:18px;width:77px;height:77px}}
 @media(max-width:620px){.attack-button{bottom:152px;right:10px;width:66px;height:66px;font-size:10px}.attack-button span:first-child{font-size:21px}}
+
+
+/* v0.8: crafting-table recipes with visible supply requirements and blueprint picker. */
+.craft-panel{width:min(690px,93vw);max-height:88vh;overflow:auto}
+.material-recipe{width:100%;min-height:88px;text-align:left;display:flex;align-items:center;gap:13px;justify-content:stretch;background:rgba(37,67,53,.95);border:1px solid #82aa7b55;transition:background .15s,border-color .15s}
+.material-recipe:hover:not(:disabled){background:#365d46;border-color:#f2c376}
+.material-recipe:disabled{cursor:not-allowed;opacity:.69}
+.material-recipe .recipe-icon{font-size:30px;flex:0 0 36px;text-align:center}
+.material-recipe .recipe-body{display:flex;flex-direction:column;gap:7px;flex:1;min-width:0}
+.material-recipe .recipe-body strong{font-size:15px;color:#fff3db}
+.material-recipe .recipe-body small{font-size:11px;line-height:1.4;color:#c5d3c1}
+.material-recipe .recipe-action{flex:0 0 106px;display:flex;align-items:center;justify-content:center;min-height:35px;padding:7px 8px;background:#c9e6aa;color:#1b392a;border-radius:8px;font-size:10px;font-weight:900;text-align:center;letter-spacing:.3px}
+.material-recipe:disabled .recipe-action{background:#6e6e62;color:#ede8d4}
+.recipe-costs{display:flex;gap:5px;flex-wrap:wrap}
+.resource-pill{font-size:10px;font-weight:900;padding:4px 8px;border-radius:6px;border:1px solid transparent;letter-spacing:.3px}
+.resource-pill.enough{color:#c5f3c9;background:#23724450;border-color:#6dc28a70}
+.resource-pill.missing{color:#ffd6ca;background:#8a3d365c;border-color:#b5766492}
+.craft-footer{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;padding:12px 0;line-height:1.6}
+.construction-help{background:#304b3d;border:1px solid #bfb38555;border-radius:10px;font-size:11px;line-height:1.7;padding:11px 12px;margin-top:10px;color:#e7eacb}
+.material-recipe.chosen-blueprint{border-color:#ffd27b;box-shadow:inset 0 0 0 1px #e1af5f}
+.safety-state+#base-count,.safety-state+#blueprint-state{border-top:1px solid #ffffff12;margin-top:5px;padding-top:5px;color:#cbe4c0}
+#blueprint-state{font-size:10px}
+@media(max-width:700px){
+ .craft-panel{width:95vw;padding:16px}
+ .material-recipe{gap:6px;padding:12px 8px}
+ .material-recipe .recipe-icon{font-size:23px;flex-basis:26px}
+ .material-recipe .recipe-action{flex-basis:74px;font-size:9px}
+ .material-recipe .recipe-body strong{font-size:13px}
+ .resource-pill{font-size:9px}
+}

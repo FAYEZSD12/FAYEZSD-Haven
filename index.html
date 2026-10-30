@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#101d1a" />
     <meta name="description" content="FAYEZSD's Haven — a 3D survival game built with JavaScript and Three.js." />
     <title>FAYEZSD's Haven • Survival Game</title>
-    <link rel="stylesheet" href="./src/style.css?v=0.9" />
+    <link rel="stylesheet" href="./src/style.css?v=1.0" />
     <script type="importmap">
     {
       "imports": {
@@ -22,7 +22,7 @@
       <header class="topbar">
         <div class="brand">
           <div class="brand-icon" aria-hidden="true">✦</div>
-          <div><h1>FAYEZSD'S HAVEN</h1><p>FOREST SURVIVAL ADVENTURE <span class="version">V 0.9 · VISIBLE NIGHT RAIDS</span></p></div>
+          <div><h1>FAYEZSD'S HAVEN</h1><p>FOREST SURVIVAL ADVENTURE <span class="version">V 1.0 · HUNTING & CAMPFIRE COOKING</span></p></div>
         </div>
         <section class="world-info cycle-widget glass" id="cycle-info" aria-label="Day and night countdown" role="timer">
           <div class="cycle-symbol" id="cycle-symbol" aria-hidden="true">☀</div>
@@ -71,6 +71,7 @@
           <div class="stat-row"><span>◕ Hunger</span><strong id="hunger-value">100</strong></div>
           <div class="stat-track"><div id="hunger-fill" class="hunger-fill"></div></div>
           <div class="stat-row small-stat"><span>⌁ Companions</span><strong id="tamed-count">0</strong></div>
+          <div id="food-supplies" class="food-count">🥩 Raw 0 · 🍖 Cooked 0</div>
           <div id="safe-zone-state" class="safety-state">FIND THE CAMPFIRE TO STAY SAFE</div>
           <div class="safety-state" id="base-count">0 DEFENSIVE STRUCTURES</div>
           <div class="safety-state" id="blueprint-state">BUILD PLAN: WOOD WALL</div>
@@ -97,7 +98,9 @@
         <div><kbd>T</kbd> Tame <span>·</span> <kbd>B</kbd> Build</div>
         <div><kbd>E / C</kbd> Use workbench nearby</div>
         <div><kbd>G</kbd> Build plans <span>·</span> <kbd>B</kbd> Place structure</div>
-        <div><kbd>F</kbd> Eat <span>·</span> <kbd>1-9</kbd> Equip</div>
+        <div><kbd>F</kbd> Eat cooked meat <span>·</span> <kbd>4/5</kbd> Hunt</div>
+        <div><kbd>E</kbd> Use campfire to cook raw meat</div>
+        <div><kbd>0</kbd> Raw meat <span>·</span> <kbd>Q</kbd> Cooked meat</div>
         <div><kbd>1 — 9</kbd> Equip item in hand</div>
       </div>
 
@@ -113,6 +116,25 @@
           <div class="craft-footer"><span id="craft-inventory"></span><span>Crafted defenses appear in <kbd>G</kbd> Build Plans</span></div>
         </section>
       </div>
+      <div id="cook-backdrop" class="modal-backdrop hidden">
+        <section class="craft-panel cook-panel" role="dialog" aria-modal="true" aria-label="Campfire cooking">
+          <div class="craft-header">
+            <div><div class="panel-eyebrow">FIRE COOKING</div><h2>Campfire</h2><p>Put raw meat over the fire, let it roast, and eat it safely.</p></div>
+            <button id="cook-close" class="close-button" type="button" aria-label="Close campfire cooking">✕</button>
+          </div>
+          <div class="cook-inventory">
+            <div><span>🥩 RAW MEAT</span><strong id="cook-raw-count">0</strong></div>
+            <div><span>🍖 COOKED MEAT</span><strong id="cook-cooked-count">0</strong></div>
+          </div>
+          <p id="cooking-status" class="cook-status">Fire is ready. Add raw meat to cook.</p>
+          <div class="cook-progress"><div id="cooking-progress"></div></div>
+          <div class="cook-actions">
+            <button id="cook-add" class="primary-button" type="button">🔥 Cook 1 raw meat (5 sec)</button>
+            <button id="cook-eat" class="glass-button" type="button">🍖 Eat cooked meat (+38 hunger)</button>
+          </div>
+          <p class="cook-warning">Raw meat is unsafe and costs health if eaten. Cooked meat restores hunger without harming you. F eats cooked meat first.</p>
+        </section>
+      </div>
       <div id="build-backdrop" class="modal-backdrop hidden">
         <section class="craft-panel build-panel" role="dialog" aria-modal="true" aria-label="Build defenses">
           <div class="craft-header">
@@ -125,6 +147,6 @@
         </section>
       </div>
     </main>
-    <script type="module" src="./src/main.js?v=0.9"></script>
+    <script type="module" src="./src/main.js?v=1.0"></script>
   </body>
 </html>

@@ -93,6 +93,21 @@ export function createAvatar(THREE, scene, camera, mesh, mat, group) {
         mesh(g, new THREE.SphereGeometry(.135, 9, 7), berry, x, y, z);
       }
       mesh(g, new THREE.ConeGeometry(.14, .15, 6), leaves, 0, .54, 0);
+    } else if (type === 'revolver' || type === 'rifle' || type === 'sniper') {
+      // Simple original low-poly, fictional game weapon models, held upright in the character's hand.
+      const gunMetal=new THREE.MeshStandardMaterial({color:0x546575,roughness:.55,metalness:.45});
+      const accent=new THREE.MeshStandardMaterial({color:0x93734b,roughness:.8});
+      const length=type==='revolver'?.60:type==='rifle'?1.25:1.65;
+      mesh(g,new THREE.BoxGeometry(.22,.22,length),gunMetal,0,.42,-length*.30);
+      mesh(g,new THREE.BoxGeometry(.20,.44,.25),accent,0,.13,.10);
+      mesh(g,new THREE.CylinderGeometry(.10,.10,type==='revolver'?.28:.39,9),gunMetal,0,.48,-length*.70).rotation.x=Math.PI/2;
+      if(type==='rifle'||type==='sniper'){
+        mesh(g,new THREE.BoxGeometry(.28,.24,.40),accent,0,.27,.27);
+      }
+      if(type==='sniper'){
+        mesh(g,new THREE.CylinderGeometry(.09,.09,.74,9),gunMetal,0,.69,-.52).rotation.x=Math.PI/2;
+        mesh(g,new THREE.BoxGeometry(.16,.14,.12),accent,0,.73,-.48);
+      }
     } else if (type === 'raw_meat' || type === 'cooked_meat') {
       const raw = new THREE.MeshStandardMaterial({color:0xba4953,roughness:.92});
       const roasted = new THREE.MeshStandardMaterial({color:0x9d552d,roughness:.94});

@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#101d1a" />
     <meta name="description" content="FAYEZSD's Haven — a 3D survival game built with JavaScript and Three.js." />
     <title>FAYEZSD's Haven • Survival Game</title>
-    <link rel="stylesheet" href="./src/style.css?v=1.0" />
+    <link rel="stylesheet" href="./src/style.css?v=1.1" />
     <script type="importmap">
     {
       "imports": {
@@ -22,7 +22,7 @@
       <header class="topbar">
         <div class="brand">
           <div class="brand-icon" aria-hidden="true">✦</div>
-          <div><h1>FAYEZSD'S HAVEN</h1><p>FOREST SURVIVAL ADVENTURE <span class="version">V 1.0 · HUNTING & CAMPFIRE COOKING</span></p></div>
+          <div><h1>FAYEZSD'S HAVEN</h1><p>FOREST SURVIVAL ADVENTURE <span class="version">V 1.1 · WEAPONS & ONE-CLICK ACTIONS</span></p></div>
         </div>
         <section class="world-info cycle-widget glass" id="cycle-info" aria-label="Day and night countdown" role="timer">
           <div class="cycle-symbol" id="cycle-symbol" aria-hidden="true">☀</div>
@@ -79,11 +79,16 @@
       </div>
 
       <nav id="hotbar" aria-label="Inventory hotbar" class="hotbar glass"></nav>
+      <nav id="weapon-quickbar" class="weapon-quickbar glass" aria-label="Quick select weapons">
+        <span class="weapon-quickbar-title">WEAPONS</span>
+        <div id="gun-buttons" class="gun-buttons"></div>
+        <span id="ammo-status" class="ammo-status">📦 AMMO: 0</span>
+      </nav>
       <button id="jump-button" class="jump-button" type="button" aria-label="Jump">
         <span class="jump-arrow" aria-hidden="true">↑</span><span>JUMP</span><small>SPACE</small>
       </button>
-      <button id="attack-button" class="attack-button" type="button" aria-label="Attack nearby enemy">
-        <span aria-hidden="true">⚔</span><span>ATTACK</span><small>R / CLICK</small>
+      <button id="attack-button" class="attack-button" type="button" aria-label="Use tool or attack">
+        <span aria-hidden="true">⚔</span><span>USE TOOL</span><small>CLICK / R</small>
       </button>
 
       <div class="bottom-right glass controls">
@@ -98,8 +103,9 @@
         <div><kbd>T</kbd> Tame <span>·</span> <kbd>B</kbd> Build</div>
         <div><kbd>E / C</kbd> Use workbench nearby</div>
         <div><kbd>G</kbd> Build plans <span>·</span> <kbd>B</kbd> Place structure</div>
-        <div><kbd>F</kbd> Eat cooked meat <span>·</span> <kbd>4/5</kbd> Hunt</div>
-        <div><kbd>E</kbd> Use campfire to cook raw meat</div>
+        <div><kbd>4</kbd> Starter Axe <span>·</span> <kbd>CLICK</kbd> Chop / Hunt / Fire</div>
+        <div><kbd>Z</kbd> Revolver <span>·</span> <kbd>X</kbd> Rifle <span>·</span> <kbd>H</kbd> Sniper</div>
+        <div><kbd>E</kbd> Gather / Workbench / Campfire <span>·</span> <kbd>R</kbd> Use tool</div>
         <div><kbd>0</kbd> Raw meat <span>·</span> <kbd>Q</kbd> Cooked meat</div>
         <div><kbd>1 — 9</kbd> Equip item in hand</div>
       </div>
@@ -147,6 +153,6 @@
         </section>
       </div>
     </main>
-    <script type="module" src="./src/main.js?v=1.0"></script>
+    <script type="module" src="./src/main.js?v=1.1"></script>
   </body>
 </html>

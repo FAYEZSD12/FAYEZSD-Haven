@@ -27,25 +27,25 @@ export function createHuntingAndCooking(THREE,scene,mesh,mat,height,animals,inve
     drops.splice(index,1);
     return drop.amount;
   }
-  function closestWildAnimal(player,yaw,maxRange=4.2){
+  function closestWildAnimal(player,yaw,maxRange=4.2,accuracy=0){
     let best=null,dist=Infinity;
     for(const animal of animals){
       if(animal.alive===false)continue;
       const dx=animal.g.position.x-player.position.x,dz=animal.g.position.z-player.position.z;
       const d=Math.hypot(dx,dz);
       if(d>maxRange||d<.001||d>=dist)continue;
-      if((Math.sin(yaw)*dx+Math.cos(yaw)*dz)/d<.0)continue;
+      if((Math.sin(yaw)*dx+Math.cos(yaw)*dz)/d<accuracy)continue;
       best=animal;dist=d;
     }
     return best;
   }
-  function hunt(player,yaw,weapon){
-    if(weapon!=='axe'&&weapon!=='pickaxe'){
-      return {hit:false,reason:'Equip your axe (4) or pickaxe (5) to hunt animals.'};
+  function hunt(player,yaw,weapon,shot=null){
+    if(!shot&&weapon!=='axe'&&weapon!=='pickaxe'){
+      return {hit:false,reason:'Equip your axe (4), pickaxe (5), or a crafted firearm to hunt.'};
     }
-    const animal=closestWildAnimal(player,yaw);
-    if(!animal)return {hit:false,reason:'No animal in range. Walk closer and face one.'};
-    animal.hp=(animal.hp??2)-2; // One deliberate axe/pickaxe hit defeats a wild animal.
+    const animal=closestWildAnimal(player,yaw,shot?.range??4.2,shot?.accuracy??0);
+    if(!animal)return {hit:false,reason:shot?'No animal in your sights. Face an animal and fire.':'No animal in range. Walk closer and face one.'};
+    animal.hp=(animal.hp??2)-(shot?.damage??2);
     if(animal.hp>0)return {hit:true,killed:false,message:'Animal hit!'};
     animal.alive=false;animal.tamed=false;
     scene.remove(animal.g);
@@ -119,5 +119,5 @@ export function createHuntingAndCooking(THREE,scene,mesh,mat,height,animals,inve
       cooking={remaining:Math.min(COOK_SECONDS,state.cookingRemaining)};
     }
   }
-  return {hunt,updateDrops,getNearbyFire,canCook,startCooking,updateCooking,cookInfo,eat,saveState,restoreState,getDrops:()=>drops,COOK_SECONDS};
+  return {hunt,closestWildAnimal,updateDrops,getNearbyFire,canCook,startCooking,updateCooking,cookInfo,eat,saveState,restoreState,getDrops:()=>drops,COOK_SECONDS};
 }

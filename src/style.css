@@ -46,3 +46,16 @@
  .jump-button{bottom:79px;right:10px;width:66px;height:66px;font-size:11px}
  .jump-button .jump-arrow{font-size:20px}
 }
+
+
+/* v0.7 Night Raid: important warning and combat affordances */
+.threat-status{color:#d8e9d5;font-weight:700;font-size:11px;letter-spacing:.2px;line-height:1.5;margin:7px 0 11px;padding:9px 10px;border-radius:8px;background:rgba(37,82,55,.32);border:1px solid rgba(131,203,152,.26)}
+.threat-status.is-danger{color:#ffbabb;background:rgba(130,31,46,.38);border-color:#de667a8a}
+.safety-state{margin-top:9px;border-top:1px solid #ffffff25;padding-top:10px;font-size:10px;line-height:1.4;letter-spacing:.12px;color:#f5cd87}
+.attack-button{position:absolute;bottom:363px;right:23px;width:88px;height:88px;pointer-events:auto;border:1px solid #d47e84b0;border-radius:50%;background:rgba(91,34,43,.90);box-shadow:0 0 19px #030b0a70;color:#ffe4df;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;font-size:12px;letter-spacing:.6px;font-weight:900;touch-action:manipulation}
+.attack-button span:first-child{font-size:24px;line-height:23px}
+.attack-button small{font-size:8px;color:#ffc3ae}
+.attack-button:hover{background:#7b4351}
+.attack-button:active{transform:scale(.94)}
+@media(max-width:950px){.attack-button{bottom:183px;right:18px;width:77px;height:77px}}
+@media(max-width:620px){.attack-button{bottom:152px;right:10px;width:66px;height:66px;font-size:10px}.attack-button span:first-child{font-size:21px}}

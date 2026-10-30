@@ -1,6 +1,6 @@
 import * as THREE from 'three';
-import { createAvatar } from './avatar.js';
-import { createForestMood } from './forest.js';
+import { createAvatar } from './avatar.js?v=0.5';
+import { createForestMood } from './forest.js?v=0.5';
 const $=id=>document.getElementById(id);
 const scene=new THREE.Scene();scene.background=new THREE.Color(0xb9dce8);scene.fog=new THREE.Fog(0xb9dce8,55,155);
 const camera=new THREE.PerspectiveCamera(65,innerWidth/innerHeight,.1,250);
@@ -128,7 +128,7 @@ if(jumpVelocity!==0||jumpHeight>0){
 }
 player.position.y=height(player.position.x,player.position.z)+jumpHeight;
 avatar.animate(dt,len>0,keys.has('ShiftLeft'),jumpHeight>0);
-const nightStrength=forest.update(time);
+forest.update(time);
 for(const a of animals){a.phase+=dt;if(a.tamed){let dx=player.position.x-a.g.position.x,dz=player.position.z-a.g.position.z,d=Math.hypot(dx,dz);if(d>3){a.g.position.x+=dx/d*dt*3;a.g.position.z+=dz/d*dt*3}}else{a.g.position.x+=Math.sin(a.phase)*dt*.25;a.g.position.z+=Math.cos(a.phase*.7)*dt*.25}a.g.position.y=height(a.g.position.x,a.g.position.z)}
 // Smooth camera zoom. Hide the avatar inside first person so the head does not obstruct the view.
 zoomCurrent=THREE.MathUtils.damp(zoomCurrent,zoomTarget,14,dt);
@@ -145,7 +145,7 @@ if(firstPerson){
   camera.position.lerp(target.clone().add(offset),.24);
   camera.lookAt(target);
 }
-$('day-readout').textContent='DAY '+String(Math.floor(time/250)+1).padStart(2,'0')+' · '+(time%250<125?'DAYLIGHT':'NIGHTFALL')+' · '+(firstPerson?'FIRST PERSON':'THIRD PERSON');
+$('day-readout').textContent='DAY '+String(Math.floor(time/250)+1).padStart(2,'0')+' · '+(time%250<80||time%250>205?'DAYLIGHT':time%250<118?'DUSK':'NIGHT')+' · '+(firstPerson?'FIRST PERSON':'THIRD PERSON');
 const near=resources.find(r=>r.ready&&dist(r.x,r.z)<3.5);$('interaction').classList.toggle('hidden',!near);if(near){$('interaction-title').textContent='Gather '+near.type;$('interaction-hint').textContent='Press E to collect resources'}
 if(Math.floor(now/350)!==Math.floor((now-dt*1000)/350))updateUI();renderer.render(scene,camera)}
 requestAnimationFrame(animate);

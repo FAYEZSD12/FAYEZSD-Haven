@@ -1,10 +1,10 @@
 import * as THREE from 'three';
-import { createAvatar } from './avatar.js?v=0.5';
+import { createAvatar } from './avatar.js?v=1.1';
 import { createForestMood, getDayNightInfo } from './forest.js?v=0.6';
-import { createNightEnemies } from './enemies.js?v=0.9';
+import { createNightEnemies } from './enemies.js?v=1.1';
 import { createHuntingAndCooking } from './hunting.js?v=1.1';
 import { FIREARMS,isFirearm,tryFire } from './weapons.js?v=1.1';
-import { RECIPES, BUILDABLE, STATISTICS, canAfford, craftRecipe, createBaseBuilding } from './building.js?v=0.8';
+import { RECIPES, BUILDABLE, STATISTICS, canAfford, craftRecipe, createBaseBuilding } from './building.js?v=1.1';
 const $=id=>document.getElementById(id);
 const scene=new THREE.Scene();scene.background=new THREE.Color(0xb9dce8);scene.fog=new THREE.Fog(0xb9dce8,55,155);
 const camera=new THREE.PerspectiveCamera(65,innerWidth/innerHeight,.1,250);

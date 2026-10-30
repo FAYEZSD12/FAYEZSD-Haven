@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#101d1a" />
     <meta name="description" content="FAYEZSD's Haven — a 3D survival game built with JavaScript and Three.js." />
     <title>FAYEZSD's Haven • Survival Game</title>
-    <link rel="stylesheet" href="./src/style.css?v=0.6" />
+    <link rel="stylesheet" href="./src/style.css?v=0.7" />
     <script type="importmap">
     {
       "imports": {
@@ -22,7 +22,7 @@
       <header class="topbar">
         <div class="brand">
           <div class="brand-icon" aria-hidden="true">✦</div>
-          <div><h1>FAYEZSD'S HAVEN</h1><p>FOREST SURVIVAL ADVENTURE <span class="version">V 0.6 · JUMP & SURVIVAL CLOCK</span></p></div>
+          <div><h1>FAYEZSD'S HAVEN</h1><p>FOREST SURVIVAL ADVENTURE <span class="version">V 0.7 · NIGHT RAID</span></p></div>
         </div>
         <section class="world-info cycle-widget glass" id="cycle-info" aria-label="Day and night countdown" role="timer">
           <div class="cycle-symbol" id="cycle-symbol" aria-hidden="true">☀</div>
@@ -64,6 +64,7 @@
           <div class="stat-row"><span>◕ Hunger</span><strong id="hunger-value">100</strong></div>
           <div class="stat-track"><div id="hunger-fill" class="hunger-fill"></div></div>
           <div class="stat-row small-stat"><span>⌁ Companions</span><strong id="tamed-count">0</strong></div>
+          <div id="safe-zone-state" class="safety-state">FIND THE CAMPFIRE TO STAY SAFE</div>
         </div>
       </div>
 
@@ -71,11 +72,16 @@
       <button id="jump-button" class="jump-button" type="button" aria-label="Jump">
         <span class="jump-arrow" aria-hidden="true">↑</span><span>JUMP</span><small>SPACE</small>
       </button>
+      <button id="attack-button" class="attack-button" type="button" aria-label="Attack nearby enemy">
+        <span aria-hidden="true">⚔</span><span>ATTACK</span><small>R / CLICK</small>
+      </button>
 
       <div class="bottom-right glass controls">
         <div class="panel-eyebrow">CONTROLS</div>
+        <div id="threat-status" class="threat-status" role="status">☀ Safe daylight · prepare your defenses</div>
         <div><kbd>W A S D</kbd> Move <span>·</span> <kbd>SHIFT</kbd> Run</div>
-        <div><kbd>SPACE</kbd> Jump <span>·</span> <kbd>V</kbd> Camera</div>
+        <div><kbd>SPACE</kbd> Jump <span>·</span> <kbd>R / CLICK</kbd> Attack</div>
+        <div><kbd>V</kbd> Camera <span>·</span> <kbd>N</kbd> Test next phase</div>
         <div><kbd>DRAG</kbd> Camera <span>·</span> <kbd>SCROLL</kbd> Zoom</div>
         <div><kbd>ZOOM IN</kbd> First person <span>·</span> <kbd>V</kbd> Toggle camera</div>
         <div><kbd>CLICK</kbd> Look in first person <span>·</span> <kbd>E</kbd> Gather</div>
@@ -97,6 +103,6 @@
         </section>
       </div>
     </main>
-    <script type="module" src="./src/main.js?v=0.6"></script>
+    <script type="module" src="./src/main.js?v=0.7"></script>
   </body>
 </html>

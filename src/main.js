@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import { createAvatar } from './avatar.js?v=0.5';
 import { createForestMood, getDayNightInfo } from './forest.js?v=0.6';
-import { createNightEnemies } from './enemies.js?v=0.7';
+import { createNightEnemies } from './enemies.js?v=0.8';
+import { RECIPES, BUILDABLE, STATISTICS, canAfford, craftRecipe, createBaseBuilding } from './building.js?v=0.8';
 const $=id=>document.getElementById(id);
 const scene=new THREE.Scene();scene.background=new THREE.Color(0xb9dce8);scene.fog=new THREE.Fog(0xb9dce8,55,155);
 const camera=new THREE.PerspectiveCamera(65,innerWidth/innerHeight,.1,250);
@@ -17,7 +18,7 @@ const p=groundGeo.attributes.position;for(let i=0;i<p.count;i++)p.setY(i,height(
 const ground=new THREE.Mesh(groundGeo,green);ground.receiveShadow=true;scene.add(ground);
 function mesh(parent,geo,m,x,y,z,sx=1,sy=1,sz=1){const o=new THREE.Mesh(geo,m);o.position.set(x,y,z);o.scale.set(sx,sy,sz);o.castShadow=true;parent.add(o);return o}
 function group(x,z){let g=new THREE.Group();g.position.set(x,height(x,z),z);scene.add(g);return g}
-const resources=[],animals=[],structures=[],rand=(a,b)=>a+Math.random()*(b-a);
+const resources=[],animals=[],rand=(a,b)=>a+Math.random()*(b-a);
 function resource(type,x,z){
   const g=group(x,z);
   if(type==='tree'){
@@ -44,11 +45,13 @@ const forest=createForestMood(THREE,scene,mesh,mat,height,ground,grass,sun,hemis
 const avatar=createAvatar(THREE,scene,camera,mesh,mat,group);
 const player=avatar.player;
 // New players begin close to the campfire. An existing save restores their last position.
-player.position.set(0,height(0,9),9);
-const threats=createNightEnemies(THREE,scene,mesh,mat,height,forest.campfirePosition);
+player.position.set(2,height(2,14),14); // Spawn within reach of the crafting table.
+const base=createBaseBuilding(THREE,scene,mesh,mat,height,forest.campfirePosition);
+const threats=createNightEnemies(THREE,scene,mesh,mat,height,forest.campfirePosition,base);
 for(let i=0;i<12;i++){let x=rand(-65,65),z=rand(-65,65);let g=group(x,z);mesh(g,new THREE.BoxGeometry(.9,.66,1.6),animalMat,0,.65,0);mesh(g,new THREE.BoxGeometry(.55,.55,.62),animalMat,0,1.06,.9);for(let xx of [-.32,.32])for(let zz of [-.49,.49])mesh(g,new THREE.CylinderGeometry(.1,.1,.6,6),animalMat,xx,.22,zz);animals.push({g,x,z,tamed:false,phase:rand(0,10)})}
 const items=[['rope','Rope','🪢'],['wall','Wall','🧱'],['campfire','Fire','🔥'],['axe','Axe','🪓'],['pickaxe','Pickaxe','⛏️'],['wood','Wood','🪵'],['stone','Stone','🪨'],['fiber','Fiber','🌿'],['berries','Berries','🫐']];
-const inv={rope:1,wall:1,campfire:1,axe:1,pickaxe:1,wood:4,stone:4,fiber:5,berries:3},recipes=[['rope',{fiber:3}],['wall',{wood:4}],['campfire',{wood:2,stone:4}],['axe',{wood:2,stone:2}],['pickaxe',{wood:2,stone:3}]];
+const inv={rope:1,wall:1,reinforced:0,spikes:0,campfire:1,axe:1,pickaxe:1,wood:4,stone:4,fiber:5,berries:3};
+let buildChoice='wall';
 let selected=0,health=100,hunger=100,time=0,yaw=0,pitch=.45,drag=false,lastX=0,lastY=0;
 let jumpHeight=0,jumpVelocity=0; // The character's airborne height above the terrain.
 let jumpHeld=false;
@@ -56,7 +59,7 @@ const JUMP_SPEED=10.5,GRAVITY=25;
 function attemptJump(){
   // A real jump starts instantly on the ground, even if the last frame has not run yet.
   if(jumpHeight>0.001||jumpVelocity>0)return false;
-  if(!$('craft-backdrop').classList.contains('hidden'))return false;
+  if(!$('craft-backdrop').classList.contains('hidden')||!$('build-backdrop').classList.contains('hidden'))return false;
   jumpVelocity=JUMP_SPEED;
   jumpHeight=.035;
   return true;
@@ -115,7 +118,7 @@ function takeEnemyDamage(amount,attacker){
     const currentNight=getDayNightInfo(time).cycleNumber;
     time=currentNight*270;
     threats.despawn();
-    player.position.set(forest.campfirePosition.x,height(forest.campfirePosition.x,forest.campfirePosition.z-4),forest.campfirePosition.z-4);
+    player.position.set(2,height(2,forest.campfirePosition.z+1),forest.campfirePosition.z+1);
     health=100;hunger=Math.max(hunger,60);
     jumpHeight=0;jumpVelocity=0;
     notify('You were defeated by '+attacker+'. Respawned at camp for a new day.');
@@ -134,15 +137,110 @@ function updateThreatUI(phase,state){
 }
 function notify(msg){$('toast').textContent=msg;$('toast').classList.add('show');clearTimeout(notify.timer);notify.timer=setTimeout(()=>$('toast').classList.remove('show'),2500)}
 function dist(x,z){return Math.hypot(player.position.x-x,player.position.z-z)}
-function updateUI(){avatar.equip(items[selected]?.[0],inv[items[selected]?.[0]]||0);const bar=$('hotbar');bar.innerHTML='';items.forEach(([id,n,emoji],i)=>{let b=document.createElement('button');b.className='slot'+(i===selected?' selected':'');b.innerHTML='<small>'+(i+1)+'</small><span>'+emoji+'</span><strong>'+n+'</strong><em>'+ (inv[id]||0)+'</em>';b.onclick=()=>{selected=i;updateUI()};bar.appendChild(b)});$('health-value').textContent=Math.floor(health);$('hunger-value').textContent=Math.floor(hunger);$('health-fill').style.width=health+'%';$('hunger-fill').style.width=hunger+'%';$('tamed-count').textContent=animals.filter(a=>a.tamed).length;Object.keys(goals).forEach(k=>{let el=document.querySelector('[data-goal="'+k+'"]');if(el)el.classList.toggle('complete',goals[k])});let done=Object.values(goals).filter(Boolean).length;$('quest-progress').textContent=done+' / 4';$('quest-progress-bar').style.width=done*25+'%'}
+function updateUI(){
+  avatar.equip(items[selected]?.[0],inv[items[selected]?.[0]]||0);
+  $('base-count').textContent=base.structures.filter(item=>item.type!=='campfire').length+' DEFENSIVE STRUCTURES';
+  const chosen=RECIPES.find(r=>r.id===buildChoice);
+  $('blueprint-state').textContent='BUILD PLAN: '+(chosen?chosen.name.toUpperCase():'WOOD WALL')+' ('+(inv[buildChoice]||0)+' READY)';
+  const bar=$('hotbar');bar.innerHTML='';items.forEach(([id,n,emoji],i)=>{let b=document.createElement('button');b.className='slot'+(i===selected?' selected':'');b.innerHTML='<small>'+(i+1)+'</small><span>'+emoji+'</span><strong>'+n+'</strong><em>'+ (inv[id]||0)+'</em>';b.onclick=()=>{selected=i;if(id==='wall'||id==='campfire')buildChoice=id;updateUI()};bar.appendChild(b)});$('health-value').textContent=Math.floor(health);$('hunger-value').textContent=Math.floor(hunger);$('health-fill').style.width=health+'%';$('hunger-fill').style.width=hunger+'%';$('tamed-count').textContent=animals.filter(a=>a.tamed).length;Object.keys(goals).forEach(k=>{let el=document.querySelector('[data-goal="'+k+'"]');if(el)el.classList.toggle('complete',goals[k])});let done=Object.values(goals).filter(Boolean).length;$('quest-progress').textContent=done+' / 4';$('quest-progress-bar').style.width=done*25+'%'}
 function gather(){let r=resources.filter(r=>r.ready&&dist(r.x,r.z)<3.5).sort((a,b)=>dist(a.x,a.z)-dist(b.x,b.z))[0];if(!r)return notify('Get closer to a tree, rock or bush');let id=r.type==='tree'?'wood':r.type==='rock'?'stone':'fiber';inv[id]=(inv[id]||0)+(r.type==='tree'?3:2);if(r.type==='bush')inv.berries++;r.ready=false;r.g.visible=false;setTimeout(()=>{r.ready=true;r.g.visible=true},20000);goals.gather=true;notify('Collected '+id);updateUI()}
 function tame(){let a=animals.filter(a=>!a.tamed&&dist(a.x,a.z)<4).sort((a,b)=>dist(a.x,a.z)-dist(b.x,b.z))[0];if(!a)return notify('Approach an untamed animal');if(!inv.rope)return notify('Craft a rope first');inv.rope--;a.tamed=true;goals.tame=true;notify('Animal tamed! It will follow you.');updateUI()}
-function build(){let type=items[selected][0];if(!['wall','campfire'].includes(type))return notify('Select a wall or campfire in the hotbar');if(!inv[type])return notify('Craft this structure first');inv[type]--;let angle=yaw,g=group(player.position.x+Math.sin(angle)*3,player.position.z+Math.cos(angle)*3);if(type==='wall')mesh(g,new THREE.BoxGeometry(3,2,.35),brown,0,1,0);else{mesh(g,new THREE.CylinderGeometry(.65,.7,.25,10),stone,0,.15,0);mesh(g,new THREE.ConeGeometry(.4,1,8),mat(0xf58c2a),0,.75,0)}structures.push({type,x:g.position.x,z:g.position.z});goals.build=true;notify(type+' placed');updateUI()}
-function renderRecipes(){const div=$('craft-recipes');div.innerHTML='';for(const [id,cost] of recipes){let r=document.createElement('button');r.className='recipe';r.innerHTML='<strong>'+items.find(i=>i[0]===id)[2]+' '+id.toUpperCase()+'</strong><small>'+Object.entries(cost).map(([k,v])=>k+': '+v).join(' · ')+'</small>';r.onclick=()=>{if(Object.entries(cost).some(([k,v])=>(inv[k]||0)<v))return notify('Not enough resources');for(const [k,v] of Object.entries(cost))inv[k]-=v;inv[id]=(inv[id]||0)+1;goals.craft=true;notify('Crafted '+id);updateUI()};div.appendChild(r)}}
-function craft(){const modal=$('craft-backdrop');modal.classList.toggle('hidden');if(!modal.classList.contains('hidden'))renderRecipes()}
-function save(){try{localStorage.setItem('fayez-haven-v1',JSON.stringify({inv,health,hunger,time,goals,x:player.position.x,z:player.position.z,structures, tamed:animals.map((a,i)=>a.tamed?i:null).filter(x=>x!==null)}));notify('Game saved in this browser')}catch(e){notify('Save unavailable in this browser')}}
-function load(){try{let s=JSON.parse(localStorage.getItem('fayez-haven-v1')||'null');if(!s)return;Object.assign(inv,s.inv||{});Object.assign(goals,s.goals||{});health=s.health??100;hunger=s.hunger??100;time=s.time||0;player.position.x=s.x||0;player.position.z=s.z||0;for(let i of (s.tamed||[]))if(animals[i])animals[i].tamed=true;notify('Previous save loaded')}catch(e){console.warn(e)}}
-$('save-btn').onclick=save;$('craft-toggle').onclick=craft;$('craft-close').onclick=craft;
+// Crafting takes place ONLY when the character stands near the world workbench.
+function renderRecipes(){
+  const panel=$('craft-recipes');panel.innerHTML='';
+  for(const recipe of RECIPES){
+    const affordable=canAfford(recipe,inv);
+    const button=document.createElement('button');
+    button.className='recipe material-recipe'+(affordable?'':' resource-shortage');
+    button.disabled=!affordable;
+    const requirements=Object.entries(recipe.cost).map(([name,needed])=>{
+      const owned=inv[name]||0;
+      return '<span class="resource-pill '+(owned>=needed?'enough':'missing')+'">'+name.toUpperCase()+' '+owned+'/'+needed+'</span>';
+    }).join('');
+    button.innerHTML='<span class="recipe-icon">'+recipe.icon+'</span><span class="recipe-body"><strong>'+recipe.name+'</strong><small>'+recipe.description+'</small><span class="recipe-costs">'+requirements+'</span></span><span class="recipe-action">'+(affordable?'CRAFT':'NEED SUPPLIES')+'</span>';
+    button.onclick=()=>{
+      if(!base.nearTable(player)){notify('Return to the crafting table');craft(false);return;}
+      if(!craftRecipe(recipe,inv)){notify('Gather more supplies first');renderRecipes();return;}
+      goals.craft=true;
+      if(BUILDABLE.includes(recipe.id))buildChoice=recipe.id;
+      notify(recipe.name+' crafted!'+(BUILDABLE.includes(recipe.id)?' Press B to place it.':''));
+      updateUI();renderRecipes();
+    };
+    panel.appendChild(button);
+  }
+  $('craft-inventory').textContent='SUPPLIES · WOOD '+(inv.wood||0)+'  •  STONE '+(inv.stone||0)+'  •  FIBER '+(inv.fiber||0);
+}
+function craft(force){
+  const modal=$('craft-backdrop');
+  if(force===false){modal.classList.add('hidden');return;}
+  if(!modal.classList.contains('hidden')){modal.classList.add('hidden');return;}
+  if(!base.nearTable(player))return notify('Get closer to the wooden crafting table at camp. Press E or C nearby.');
+  $('build-backdrop').classList.add('hidden');modal.classList.remove('hidden');renderRecipes();
+}
+function renderBuildMenu(){
+  const panel=$('build-options');panel.innerHTML='';
+  for(const id of BUILDABLE){
+    const recipe=RECIPES.find(r=>r.id===id),qty=inv[id]||0;
+    const button=document.createElement('button');
+    button.className='recipe material-recipe'+(id===buildChoice?' chosen-blueprint':'');
+    button.innerHTML='<span class="recipe-icon">'+recipe.icon+'</span><span class="recipe-body"><strong>'+recipe.name+'</strong><small>'+recipe.description+'</small></span><span class="recipe-action">'+qty+' READY</span>';
+    button.onclick=()=>{
+      buildChoice=id;
+      $('build-backdrop').classList.add('hidden');
+      updateUI();
+      notify(recipe.name+' selected. Walk to your base perimeter and press B to place it.');
+    };
+    panel.appendChild(button);
+  }
+  $('build-summary').textContent='If your kit count is 0, gather supplies and craft another at the table.';
+}
+function buildMenu(force){
+  const modal=$('build-backdrop');
+  if(force===false){modal.classList.add('hidden');return;}
+  if(!modal.classList.contains('hidden')){modal.classList.add('hidden');return;}
+  $('craft-backdrop').classList.add('hidden');modal.classList.remove('hidden');renderBuildMenu();
+}
+function build(){
+  if(!$('craft-backdrop').classList.contains('hidden')||!$('build-backdrop').classList.contains('hidden'))return;
+  const type=buildChoice;
+  if((inv[type]||0)<1)return notify('You need a crafted '+type+' kit. Use the camp workbench first.');
+  const result=base.place(type,player,yaw);
+  if(!result.ok)return notify(result.reason);
+  inv[type]--;
+  goals.build=true;
+  notify('Placed '+RECIPES.find(r=>r.id===type).name+'! Defenses block cultists until destroyed.');
+  updateUI();
+}
+function save(){
+  try{
+    localStorage.setItem('fayez-haven-v1',JSON.stringify({
+      inv,health,hunger,time,goals,x:player.position.x,z:player.position.z,
+      structures:base.exportStructures(),buildChoice,
+      tamed:animals.map((a,i)=>a.tamed?i:null).filter(x=>x!==null)
+    }));
+    notify('Game and defenses saved in this browser');
+  }catch(e){notify('Save unavailable in this browser');}
+}
+function load(){
+  try{
+    const saved=JSON.parse(localStorage.getItem('fayez-haven-v1')||'null');
+    if(!saved)return;
+    Object.assign(inv,saved.inv||{});
+    Object.assign(goals,saved.goals||{});
+    health=saved.health??100;hunger=saved.hunger??100;time=saved.time||0;
+    player.position.x=saved.x??player.position.x;
+    player.position.z=saved.z??player.position.z;
+    if(BUILDABLE.includes(saved.buildChoice))buildChoice=saved.buildChoice;
+    base.restore(saved.structures);
+    for(const i of (saved.tamed||[]))if(animals[i])animals[i].tamed=true;
+    notify('Previous save and defenses loaded');
+  }catch(e){console.warn(e);}
+}
+$('save-btn').onclick=save;
+$('craft-toggle').onclick=()=>craft();
+$('craft-close').onclick=()=>craft(false);
+$('build-toggle').onclick=()=>buildMenu();
+$('build-close').onclick=()=>buildMenu(false);
 // Global keyboard handling (including while the hotbar or HUD has focus).
 window.addEventListener('keydown',e=>{
   const code=e.code||(e.key===' '?'Space':e.key);
@@ -155,10 +253,11 @@ window.addEventListener('keydown',e=>{
   }
   if(e.repeat)return;
   if(/^Digit[1-9]$/.test(code)){selected=+code.slice(-1)-1;updateUI()}
-  if(code==='KeyE')gather();
+  if(code==='KeyE'){if(base.nearTable(player))craft();else gather();}
   if(code==='KeyT')tame();
   if(code==='KeyB')build();
   if(code==='KeyC')craft();
+  if(code==='KeyG')buildMenu();
   if(code==='KeyR')attackEnemy();
   // Prototype test shortcut: N jumps directly to the next phase, so you can test raids immediately.
   if(code==='KeyN'){
@@ -211,7 +310,7 @@ window.addEventListener('pointermove',e=>{
 });
 // Listen on WINDOW, including when the cursor is over the HUD instead of the 3D canvas.
 window.addEventListener('wheel',e=>{
-  if(!$('craft-backdrop').classList.contains('hidden'))return;
+  if(!$('craft-backdrop').classList.contains('hidden')||!$('build-backdrop').classList.contains('hidden'))return;
   e.preventDefault();
   zoomCamera(e.deltaY,e.deltaMode);
 },{passive:false,capture:true});
@@ -260,6 +359,15 @@ if(firstPerson){
   camera.lookAt(target);
 }
 showClock();
-const near=resources.find(r=>r.ready&&dist(r.x,r.z)<3.5);$('interaction').classList.toggle('hidden',!near);if(near){$('interaction-title').textContent='Gather '+near.type;$('interaction-hint').textContent='Press E to collect resources'}
+const near=resources.find(r=>r.ready&&dist(r.x,r.z)<3.5);
+const nearWorkstation=base.nearTable(player);
+$('interaction').classList.toggle('hidden',!near&&!nearWorkstation);
+if(nearWorkstation){
+  $('interaction-title').textContent='Use Crafting Table';
+  $('interaction-hint').textContent='Press E or C to craft using your supplies';
+}else if(near){
+  $('interaction-title').textContent='Gather '+near.type;
+  $('interaction-hint').textContent='Press E to collect resources';
+}
 if(Math.floor(now/350)!==Math.floor((now-dt*1000)/350))updateUI();renderer.render(scene,camera)}
 requestAnimationFrame(animate);

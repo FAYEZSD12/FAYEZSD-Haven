@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#101d1a" />
     <meta name="description" content="FAYEZSD's Haven — a 3D survival game built with JavaScript and Three.js." />
     <title>FAYEZSD's Haven • Survival Game</title>
-    <link rel="stylesheet" href="./src/style.css?v=0.5" />
+    <link rel="stylesheet" href="./src/style.css?v=0.6" />
     <script type="importmap">
     {
       "imports": {
@@ -22,11 +22,16 @@
       <header class="topbar">
         <div class="brand">
           <div class="brand-icon" aria-hidden="true">✦</div>
-          <div><h1>FAYEZSD'S HAVEN</h1><p>FOREST SURVIVAL ADVENTURE <span class="version">V 0.5 · WILDERNESS UPDATE</span></p></div>
+          <div><h1>FAYEZSD'S HAVEN</h1><p>FOREST SURVIVAL ADVENTURE <span class="version">V 0.6 · JUMP & SURVIVAL CLOCK</span></p></div>
         </div>
-        <div class="world-info">
-          <span class="status-dot"></span><span id="day-readout">DAY 01 · MORNING</span>
-        </div>
+        <section class="world-info cycle-widget glass" id="cycle-info" aria-label="Day and night countdown" role="timer">
+          <div class="cycle-symbol" id="cycle-symbol" aria-hidden="true">☀</div>
+          <div class="cycle-contents">
+            <div class="cycle-heading"><strong id="day-readout">DAY 01</strong><span id="cycle-phase">DAYTIME</span></div>
+            <div class="cycle-countdown"><span id="phase-countdown-label">NIGHT IN</span><strong id="phase-countdown">03:00</strong></div>
+            <div class="cycle-progress"><div id="phase-progress"></div></div>
+          </div>
+        </section>
         <div class="header-actions">
           <button id="save-btn" class="glass-button" type="button">↧ Save</button>
           <button id="craft-toggle" class="primary-button" type="button">✦ Crafting <kbd>C</kbd></button>
@@ -63,6 +68,9 @@
       </div>
 
       <nav id="hotbar" aria-label="Inventory hotbar" class="hotbar glass"></nav>
+      <button id="jump-button" class="jump-button" type="button" aria-label="Jump">
+        <span class="jump-arrow" aria-hidden="true">↑</span><span>JUMP</span><small>SPACE</small>
+      </button>
 
       <div class="bottom-right glass controls">
         <div class="panel-eyebrow">CONTROLS</div>
@@ -89,6 +97,6 @@
         </section>
       </div>
     </main>
-    <script type="module" src="./src/main.js?v=0.5"></script>
+    <script type="module" src="./src/main.js?v=0.6"></script>
   </body>
 </html>

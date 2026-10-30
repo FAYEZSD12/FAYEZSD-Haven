@@ -6,7 +6,11 @@ export function createNightEnemies(THREE, scene, mesh, mat, height, camp, defens
   const dark=mat(0x222b2d),horn=mat(0x94836c),red= new THREE.MeshBasicMaterial({color:0xff5b48});
   const cloak=mat(0x5a303a),trim=mat(0x9a6b46),skin=mat(0xbda391),blade=mat(0xa8b8c0);
   const fx=mat(0xf5b956);
-  let currentNight=0,elapsed=0,alertTimer=0;
+  const torchFlame=new THREE.MeshBasicMaterial({color:0xffbf68});
+  const warningRed=new THREE.MeshBasicMaterial({color:0xff5147});
+  const warningOrange=new THREE.MeshBasicMaterial({color:0xffd17d});
+  let currentNight=0,elapsed=0,lastPlayerHit=-10;
+  const PLAYER_DAMAGE_COOLDOWN=1.6;
   const clamp=(x,min,max)=>Math.max(min,Math.min(max,x));
   function distance(x,z,xx,zz){return Math.hypot(x-xx,z-zz)}
   function makeEnemy(kind,x,z,index) {
@@ -25,8 +29,12 @@ export function createNightEnemies(THREE, scene, mesh, mat, height, camp, defens
         antler.rotation.z=-side*.38;
         const tip=mesh(visual,new THREE.ConeGeometry(.1,.75,5),horn,side*.7,4.75,.03);
         tip.rotation.z=-side*.62;
-        mesh(visual,new THREE.SphereGeometry(.095,7,6),red,side*.16,3.68,.39);
+        mesh(visual,new THREE.SphereGeometry(.14,8,7),red,side*.16,3.68,.39);
       }
+      // Bright, elevated red warning glow makes the stalker visible in the dark.
+      const eyesLight=new THREE.PointLight(0xff3c3c,4.5,17,2);
+      eyesLight.position.set(0,3.62,.4);visual.add(eyesLight);
+      mesh(visual,new THREE.ConeGeometry(.28,.62,7),warningRed,0,5.25,0);
     }else{
       mesh(visual,new THREE.ConeGeometry(.61,1.95,6),cloak,0,1.23,0);
       mesh(visual,new THREE.SphereGeometry(.34,8,7),cloak,0,2.36,0);
@@ -38,6 +46,12 @@ export function createNightEnemies(THREE, scene, mesh, mat, height, camp, defens
       }
       mesh(visual,new THREE.CylinderGeometry(.06,.06,.96,6),trim,.7,1.35,.18);
       mesh(visual,new THREE.BoxGeometry(.36,.34,.12),blade,.84,1.82,.18);
+      // Hand-held bright torch and floating marker, visible from the campfire.
+      mesh(visual,new THREE.CylinderGeometry(.055,.055,.9,6),trim,-.65,1.65,.18);
+      mesh(visual,new THREE.ConeGeometry(.23,.64,7),torchFlame,-.65,2.35,.18);
+      const torchLight=new THREE.PointLight(0xff9850,4.3,14,2);
+      torchLight.position.set(-.65,2.2,.18);visual.add(torchLight);
+      mesh(visual,new THREE.ConeGeometry(.25,.55,6),warningOrange,0,3.30,0);
     }
     const enemy={kind,root,visual,alive:true,hp:kind==='cultist'?3:Infinity,
       speed:kind==='stalker'?5.4:2.65+(index%3)*.25,
@@ -51,13 +65,16 @@ export function createNightEnemies(THREE, scene, mesh, mat, height, camp, defens
   }
   function spawnNight(night){
     despawn();currentNight=night;
-    const beastX=camp.x+22,beastZ=camp.z+14;
-    makeEnemy('stalker',beastX,beastZ,0);
+    // Appear just OUTSIDE the campfire's protected radius, in clear view.
+    // The first cultist approaches from directly ahead of the starting camera.
+    const positions=[
+      [0,15],[-10.5,10],[10.5,10],[-14,2],[14,2],[0,-15]
+    ];
+    makeEnemy('stalker',camp.x+12.5,camp.z+9.5,0);
     const count=Math.min(3+Math.floor((night-1)/2),6);
     for(let i=0;i<count;i++){
-      const theta=i/count*Math.PI*2+.35;
-      const dist=26+i*1.2;
-      makeEnemy('cultist',camp.x+Math.cos(theta)*dist,camp.z+Math.sin(theta)*dist,i);
+      const [dx,dz]=positions[i];
+      makeEnemy('cultist',camp.x+dx,camp.z+dz,i);
     }
     return count;
   }
@@ -133,12 +150,26 @@ export function createNightEnemies(THREE, scene, mesh, mat, height, camp, defens
       if(e.stagger>0)e.visual.rotation.z=Math.sin(elapsed*22)*.14;
       else e.visual.rotation.z=0;
       const range=isStalker?2.3:1.75;
+      // Give the player time to SEE a raid; enemies share a damage cooldown.
       if(e.attackCooldown<=0&&distance(e.root.position.x,e.root.position.z,px,pz)<range&&!(isStalker&&insideCamp)){
         e.attackCooldown=isStalker?1.55:1.15;
-        onDamage?.(isStalker?19:8,isStalker?'Forest Stalker':'Cultist Raider');
+        if(elapsed-lastPlayerHit>=PLAYER_DAMAGE_COOLDOWN){
+          lastPlayerHit=elapsed;
+          onDamage?.(isStalker?17:7,isStalker?'Forest Stalker':'Cultist Raider');
+        }
       }
     }
-    return {raiders:liveRaiders,stalker:enemies.some(e=>e.alive&&e.kind==='stalker'),insideCamp};
+    let closest=Infinity;
+    for(const e of enemies){
+      if(!e.alive)continue;
+      closest=Math.min(closest,distance(e.root.position.x,e.root.position.z,player.position.x,player.position.z));
+    }
+    return {
+      raiders:liveRaiders,
+      stalker:enemies.some(e=>e.alive&&e.kind==='stalker'),
+      insideCamp,
+      closestDistance:Number.isFinite(closest)?Math.ceil(closest):null
+    };
   }
   function attack(player,yaw,weapon){
     const damage=weapon==='axe'?2:weapon==='pickaxe'?2:1;

@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { createAvatar } from './avatar.js?v=0.5';
-import { createForestMood } from './forest.js?v=0.5';
+import { createForestMood, getDayNightInfo } from './forest.js?v=0.6';
 const $=id=>document.getElementById(id);
 const scene=new THREE.Scene();scene.background=new THREE.Color(0xb9dce8);scene.fog=new THREE.Fog(0xb9dce8,55,155);
 const camera=new THREE.PerspectiveCamera(65,innerWidth/innerHeight,.1,250);
@@ -46,8 +46,38 @@ for(let i=0;i<12;i++){let x=rand(-65,65),z=rand(-65,65);let g=group(x,z);mesh(g,
 const items=[['rope','Rope','🪢'],['wall','Wall','🧱'],['campfire','Fire','🔥'],['axe','Axe','🪓'],['pickaxe','Pickaxe','⛏️'],['wood','Wood','🪵'],['stone','Stone','🪨'],['fiber','Fiber','🌿'],['berries','Berries','🫐']];
 const inv={rope:1,wall:1,campfire:1,axe:1,pickaxe:1,wood:4,stone:4,fiber:5,berries:3},recipes=[['rope',{fiber:3}],['wall',{wood:4}],['campfire',{wood:2,stone:4}],['axe',{wood:2,stone:2}],['pickaxe',{wood:2,stone:3}]];
 let selected=0,health=100,hunger=100,time=0,yaw=0,pitch=.45,drag=false,lastX=0,lastY=0;
-let jumpHeight=0,jumpVelocity=0; // Independent height offset lets terrain and camera follow the jump.
-const JUMP_SPEED=8.5,GRAVITY=23;
+let jumpHeight=0,jumpVelocity=0; // The character's airborne height above the terrain.
+let jumpHeld=false;
+const JUMP_SPEED=10.5,GRAVITY=25;
+function attemptJump(){
+  // A real jump starts instantly on the ground, even if the last frame has not run yet.
+  if(jumpHeight>0.001||jumpVelocity>0)return false;
+  if(!$('craft-backdrop').classList.contains('hidden'))return false;
+  jumpVelocity=JUMP_SPEED;
+  jumpHeight=.035;
+  return true;
+}
+function clockText(seconds){
+  const total=Math.max(0,Math.ceil(seconds));
+  return String(Math.floor(total/60)).padStart(2,'0')+':'+String(total%60).padStart(2,'0');
+}
+let previousPhase='';
+function showClock(){
+  const phase=getDayNightInfo(time);
+  $('day-readout').textContent=phase.phase+' '+String(phase.cycleNumber).padStart(2,'0');
+  $('cycle-phase').textContent=phase.isDay?'DAYTIME':'NIGHTTIME';
+  $('phase-countdown-label').textContent=phase.isDay?'NIGHT IN':'SUNRISE IN';
+  $('phase-countdown').textContent=clockText(phase.remainingSeconds);
+  $('phase-progress').style.width=(phase.progress*100).toFixed(2)+'%';
+  $('cycle-symbol').textContent=phase.isDay?'☀':'☾';
+  const widget=$('cycle-info');
+  widget.classList.toggle('is-night',!phase.isDay);
+  widget.classList.toggle('near-sunset',phase.nearSunset);
+  if(previousPhase && previousPhase!==phase.phase){
+    notify(phase.isDay?'☀ Sunrise! Day '+phase.cycleNumber+' begins.':'☾ Night has fallen. Return to camp!');
+  }
+  previousPhase=phase.phase;
+}
 let zoomTarget=9,zoomCurrent=9; // Camera distance 0 = first person, 18 = zoomed out.
 const clampCameraDistance=value=>THREE.MathUtils.clamp(value,0,18);
 function zoomCamera(deltaY,deltaMode=0){
@@ -75,8 +105,41 @@ function craft(){const modal=$('craft-backdrop');modal.classList.toggle('hidden'
 function save(){try{localStorage.setItem('fayez-haven-v1',JSON.stringify({inv,health,hunger,time,goals,x:player.position.x,z:player.position.z,structures, tamed:animals.map((a,i)=>a.tamed?i:null).filter(x=>x!==null)}));notify('Game saved in this browser')}catch(e){notify('Save unavailable in this browser')}}
 function load(){try{let s=JSON.parse(localStorage.getItem('fayez-haven-v1')||'null');if(!s)return;Object.assign(inv,s.inv||{});Object.assign(goals,s.goals||{});health=s.health??100;hunger=s.hunger??100;time=s.time||0;player.position.x=s.x||0;player.position.z=s.z||0;for(let i of (s.tamed||[]))if(animals[i])animals[i].tamed=true;notify('Previous save loaded')}catch(e){console.warn(e)}}
 $('save-btn').onclick=save;$('craft-toggle').onclick=craft;$('craft-close').onclick=craft;
-window.addEventListener('keydown',e=>{if(['KeyW','KeyA','KeyS','KeyD','ShiftLeft','Space'].includes(e.code))e.preventDefault();keys.add(e.code);if(e.repeat)return;if(e.code==='Space'&&jumpHeight===0&&jumpVelocity===0&&$('craft-backdrop').classList.contains('hidden')){jumpVelocity=JUMP_SPEED}if(/^Digit[1-9]$/.test(e.code)){selected=+e.code.slice(-1)-1;updateUI()}if(e.code==='KeyE')gather();if(e.code==='KeyT')tame();if(e.code==='KeyB')build();if(e.code==='KeyC')craft();if(e.code==='KeyV'){zoomTarget=zoomTarget===0?9:0;if(zoomTarget!==0){pitch=Math.max(.08,pitch);if(document.pointerLockElement===renderer.domElement)document.exitPointerLock?.()}}if(e.code==='KeyF'){if(inv.berries>0){inv.berries--;hunger=Math.min(100,hunger+22);notify('Ate berries');updateUI()}}});
-window.addEventListener('keyup',e=>keys.delete(e.code));
+// Global keyboard handling (including while the hotbar or HUD has focus).
+window.addEventListener('keydown',e=>{
+  const code=e.code||(e.key===' '?'Space':e.key);
+  if(['KeyW','KeyA','KeyS','KeyD','ShiftLeft','ShiftRight','Space'].includes(code)||e.key===' '||e.key==='Spacebar')e.preventDefault();
+  keys.add(code);
+  if(code==='Space'||e.key===' '||e.key==='Spacebar'){
+    if(!jumpHeld&&!e.repeat)attemptJump();
+    jumpHeld=true;
+    return;
+  }
+  if(e.repeat)return;
+  if(/^Digit[1-9]$/.test(code)){selected=+code.slice(-1)-1;updateUI()}
+  if(code==='KeyE')gather();
+  if(code==='KeyT')tame();
+  if(code==='KeyB')build();
+  if(code==='KeyC')craft();
+  if(code==='KeyV'){
+    zoomTarget=zoomTarget===0?9:0;
+    if(zoomTarget!==0){
+      pitch=Math.max(.08,pitch);
+      if(document.pointerLockElement===renderer.domElement)document.exitPointerLock?.();
+    }
+  }
+  if(code==='KeyF'&&inv.berries>0){inv.berries--;hunger=Math.min(100,hunger+22);notify('Ate berries');updateUI()}
+},{capture:true});
+window.addEventListener('keyup',e=>{
+  const code=e.code||(e.key===' '?'Space':e.key);
+  keys.delete(code);
+  if(code==='Space'||e.key===' '||e.key==='Spacebar')jumpHeld=false;
+});
+window.addEventListener('blur',()=>{keys.clear();jumpHeld=false});
+const jumpButton=$('jump-button');
+jumpButton.addEventListener('pointerdown',e=>{e.preventDefault();attemptJump()});
+// Click fallback for devices that don't dispatch pointerdown.
+jumpButton.addEventListener('click',e=>{e.preventDefault();attemptJump()});
 // Camera input: drag in third-person or first-person; click in first-person to lock the mouse.
 renderer.domElement.addEventListener('pointerdown',e=>{
   if(e.button!==0&&e.button!==2)return;
@@ -105,7 +168,7 @@ window.addEventListener('wheel',e=>{
   zoomCamera(e.deltaY,e.deltaMode);
 },{passive:false,capture:true});
 addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)});
-load();updateUI();let prev=performance.now();
+load();updateUI();showClock();let prev=performance.now();
 function animate(now){requestAnimationFrame(animate);const dt=Math.min((now-prev)/1000,.05);prev=now;time+=dt;hunger=Math.max(0,hunger-dt*.06);if(hunger===0)health=Math.max(0,health-dt*.25);
 // Movement uses the same camera basis as the view: D points screen-right, A screen-left.
 let forward=(keys.has('KeyW')?1:0)-(keys.has('KeyS')?1:0);
@@ -120,14 +183,14 @@ if(len){
   player.position.z=THREE.MathUtils.clamp(player.position.z+(facingZ*forward+cameraRightZ*strafe)*speed*dt,-108,108);
   player.rotation.y=yaw;
 }
-// Gravity and collision with the terrain. One jump per landing (no mid-air double-jump).
+// Ground-locked vertical motion: begin at launch velocity, then accelerate downward.
 if(jumpVelocity!==0||jumpHeight>0){
-  jumpHeight+=jumpVelocity*dt;
+  jumpHeight+=jumpVelocity*dt-.5*GRAVITY*dt*dt;
   jumpVelocity-=GRAVITY*dt;
   if(jumpHeight<=0){jumpHeight=0;jumpVelocity=0;}
 }
 player.position.y=height(player.position.x,player.position.z)+jumpHeight;
-avatar.animate(dt,len>0,keys.has('ShiftLeft'),jumpHeight>0);
+avatar.animate(dt,len>0,keys.has('ShiftLeft')||keys.has('ShiftRight'),jumpHeight>0);
 forest.update(time);
 for(const a of animals){a.phase+=dt;if(a.tamed){let dx=player.position.x-a.g.position.x,dz=player.position.z-a.g.position.z,d=Math.hypot(dx,dz);if(d>3){a.g.position.x+=dx/d*dt*3;a.g.position.z+=dz/d*dt*3}}else{a.g.position.x+=Math.sin(a.phase)*dt*.25;a.g.position.z+=Math.cos(a.phase*.7)*dt*.25}a.g.position.y=height(a.g.position.x,a.g.position.z)}
 // Smooth camera zoom. Hide the avatar inside first person so the head does not obstruct the view.
@@ -145,7 +208,7 @@ if(firstPerson){
   camera.position.lerp(target.clone().add(offset),.24);
   camera.lookAt(target);
 }
-$('day-readout').textContent='DAY '+String(Math.floor(time/250)+1).padStart(2,'0')+' · '+(time%250<80||time%250>205?'DAYLIGHT':time%250<118?'DUSK':'NIGHT')+' · '+(firstPerson?'FIRST PERSON':'THIRD PERSON');
+showClock();
 const near=resources.find(r=>r.ready&&dist(r.x,r.z)<3.5);$('interaction').classList.toggle('hidden',!near);if(near){$('interaction-title').textContent='Gather '+near.type;$('interaction-hint').textContent='Press E to collect resources'}
 if(Math.floor(now/350)!==Math.floor((now-dt*1000)/350))updateUI();renderer.render(scene,camera)}
 requestAnimationFrame(animate);

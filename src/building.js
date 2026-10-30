@@ -7,7 +7,11 @@ export const RECIPES=[
   {id:'campfire',name:'Portable Campfire',icon:'🔥',category:'DEFENSE',cost:{wood:3,stone:4},description:'Decoration and lighting (not a new safe zone)'},
   {id:'rope',name:'Rope',icon:'🪢',category:'TOOLS',cost:{fiber:3},description:'Needed to tame forest animals'},
   {id:'axe',name:'Axe',icon:'🪓',category:'TOOLS',cost:{wood:2,stone:2},description:'Melee weapon'},
-  {id:'pickaxe',name:'Pickaxe',icon:'⛏️',category:'TOOLS',cost:{wood:2,stone:3},description:'Melee weapon'}
+  {id:'pickaxe',name:'Pickaxe',icon:'⛏️',category:'TOOLS',cost:{wood:2,stone:3},description:'Melee weapon'},
+  {id:'revolver',name:'Revolver',icon:'🔫',category:'RANGED',cost:{wood:5,stone:7,fiber:2},description:'Short-range hunting weapon • includes 6 ammo'},
+  {id:'rifle',name:'Rifle',icon:'🔫',category:'RANGED',cost:{wood:9,stone:11,fiber:4},description:'Longer range, quicker shots • includes 6 ammo'},
+  {id:'sniper',name:'Sniper Rifle',icon:'🎯',category:'RANGED',cost:{wood:13,stone:17,fiber:6},description:'Very long range, powerful but slow • includes 6 ammo'},
+  {id:'ammo',name:'Ammo Bundle',icon:'📦',category:'RANGED',cost:{wood:1,stone:2},description:'Adds 8 game rounds for any firearm'}
 ];
 export const BUILDABLE=['wall','reinforced','spikes','campfire'];
 export const STATISTICS={
@@ -22,7 +26,10 @@ export function canAfford(recipe,inv){
 export function craftRecipe(recipe,inv){
   if(!recipe||!canAfford(recipe,inv))return false;
   for(const [name,cost] of Object.entries(recipe.cost))inv[name]-=cost;
-  inv[recipe.id]=(inv[recipe.id]||0)+1;
+  const output=recipe.id==='ammo'?8:1;
+  inv[recipe.id]=(inv[recipe.id]||0)+output;
+  // Every newly crafted gun works immediately without another crafting step.
+  if(['revolver','rifle','sniper'].includes(recipe.id))inv.ammo=(inv.ammo||0)+6;
   return true;
 }
 export function createBaseBuilding(THREE,scene,mesh,mat,height,camp){

@@ -326,8 +326,12 @@ if(len){
   const speed=keys.has('ShiftLeft')?9:5.5;
   const facingX=Math.sin(yaw),facingZ=Math.cos(yaw);
   const cameraRightX=-facingZ,cameraRightZ=facingX;
-  player.position.x=THREE.MathUtils.clamp(player.position.x+(facingX*forward+cameraRightX*strafe)*speed*dt,-108,108);
-  player.position.z=THREE.MathUtils.clamp(player.position.z+(facingZ*forward+cameraRightZ*strafe)*speed*dt,-108,108);
+  const nextX=THREE.MathUtils.clamp(player.position.x+(facingX*forward+cameraRightX*strafe)*speed*dt,-108,108);
+  const nextZ=THREE.MathUtils.clamp(player.position.z+(facingZ*forward+cameraRightZ*strafe)*speed*dt,-108,108);
+  // Solid defensive walls stop the player as well as cultists. Test each axis so
+  // the player can slide along a wall instead of getting stuck on corners.
+  if(!base.collidesAt(nextX,player.position.z,.29))player.position.x=nextX;
+  if(!base.collidesAt(player.position.x,nextZ,.29))player.position.z=nextZ;
   player.rotation.y=yaw;
 }
 // Ground-locked vertical motion: begin at launch velocity, then accelerate downward.

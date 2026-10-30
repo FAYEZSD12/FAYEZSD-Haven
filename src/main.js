@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { createAvatar } from './avatar.js?v=0.5';
 import { createForestMood, getDayNightInfo } from './forest.js?v=0.6';
+import { createNightEnemies } from './enemies.js?v=0.7';
 const $=id=>document.getElementById(id);
 const scene=new THREE.Scene();scene.background=new THREE.Color(0xb9dce8);scene.fog=new THREE.Fog(0xb9dce8,55,155);
 const camera=new THREE.PerspectiveCamera(65,innerWidth/innerHeight,.1,250);
@@ -42,6 +43,9 @@ const grass=new THREE.InstancedMesh(new THREE.ConeGeometry(.1,.65,3),mat(0x44844
 const forest=createForestMood(THREE,scene,mesh,mat,height,ground,grass,sun,hemisphere);
 const avatar=createAvatar(THREE,scene,camera,mesh,mat,group);
 const player=avatar.player;
+// New players begin close to the campfire. An existing save restores their last position.
+player.position.set(0,height(0,9),9);
+const threats=createNightEnemies(THREE,scene,mesh,mat,height,forest.campfirePosition);
 for(let i=0;i<12;i++){let x=rand(-65,65),z=rand(-65,65);let g=group(x,z);mesh(g,new THREE.BoxGeometry(.9,.66,1.6),animalMat,0,.65,0);mesh(g,new THREE.BoxGeometry(.55,.55,.62),animalMat,0,1.06,.9);for(let xx of [-.32,.32])for(let zz of [-.49,.49])mesh(g,new THREE.CylinderGeometry(.1,.1,.6,6),animalMat,xx,.22,zz);animals.push({g,x,z,tamed:false,phase:rand(0,10)})}
 const items=[['rope','Rope','🪢'],['wall','Wall','🧱'],['campfire','Fire','🔥'],['axe','Axe','🪓'],['pickaxe','Pickaxe','⛏️'],['wood','Wood','🪵'],['stone','Stone','🪨'],['fiber','Fiber','🌿'],['berries','Berries','🫐']];
 const inv={rope:1,wall:1,campfire:1,axe:1,pickaxe:1,wood:4,stone:4,fiber:5,berries:3},recipes=[['rope',{fiber:3}],['wall',{wood:4}],['campfire',{wood:2,stone:4}],['axe',{wood:2,stone:2}],['pickaxe',{wood:2,stone:3}]];
@@ -94,6 +98,40 @@ function zoomCamera(deltaY,deltaMode=0){
   if(zoomTarget!==0)pitch=Math.max(.08,pitch);
 }
 const keys=new Set(),goals={gather:false,craft:false,tame:false,build:false};
+let lastAttackTime=-10;
+function attackEnemy(){
+  if(time-lastAttackTime<.42)return;
+  lastAttackTime=time;
+  const selectedItem=items[selected][0];
+  const result=threats.attack(player,yaw,(inv[selectedItem]||0)>0?selectedItem:'');
+  if(result.hit)notify(result.message);
+  else if(!getDayNightInfo(time).isDay)notify('Move closer to a raider and face it to attack');
+}
+function takeEnemyDamage(amount,attacker){
+  health=Math.max(0,health-amount);
+  updateUI();
+  if(health<=0){
+    // Reset to daylight after defeat, rather than respawning into a lethal raid.
+    const currentNight=getDayNightInfo(time).cycleNumber;
+    time=currentNight*270;
+    threats.despawn();
+    player.position.set(forest.campfirePosition.x,height(forest.campfirePosition.x,forest.campfirePosition.z-4),forest.campfirePosition.z-4);
+    health=100;hunger=Math.max(hunger,60);
+    jumpHeight=0;jumpVelocity=0;
+    notify('You were defeated by '+attacker+'. Respawned at camp for a new day.');
+    updateUI();
+  }else{
+    notify(attacker+' hit you (-'+amount+' health)');
+  }
+}
+function updateThreatUI(phase,state){
+  const readout=$('threat-status');
+  const nearCamp=Math.hypot(player.position.x-forest.campfirePosition.x,player.position.z-forest.campfirePosition.z)<threats.SAFE_RADIUS;
+  $('safe-zone-state').textContent=nearCamp?'🔥 CAMPFIRE SAFE ZONE · Stalker cannot enter':'⚠ OUTSIDE CAMPFIRE PROTECTION';
+  if(phase.isDay)readout.textContent='☀ Safe daylight · prepare your defenses';
+  else readout.textContent='☾ '+state.raiders+' raider'+(state.raiders===1?'':'s')+' · Stalker '+(state.stalker?'nearby':'gone');
+  readout.classList.toggle('is-danger',!phase.isDay&&state.raiders>0);
+}
 function notify(msg){$('toast').textContent=msg;$('toast').classList.add('show');clearTimeout(notify.timer);notify.timer=setTimeout(()=>$('toast').classList.remove('show'),2500)}
 function dist(x,z){return Math.hypot(player.position.x-x,player.position.z-z)}
 function updateUI(){avatar.equip(items[selected]?.[0],inv[items[selected]?.[0]]||0);const bar=$('hotbar');bar.innerHTML='';items.forEach(([id,n,emoji],i)=>{let b=document.createElement('button');b.className='slot'+(i===selected?' selected':'');b.innerHTML='<small>'+(i+1)+'</small><span>'+emoji+'</span><strong>'+n+'</strong><em>'+ (inv[id]||0)+'</em>';b.onclick=()=>{selected=i;updateUI()};bar.appendChild(b)});$('health-value').textContent=Math.floor(health);$('hunger-value').textContent=Math.floor(hunger);$('health-fill').style.width=health+'%';$('hunger-fill').style.width=hunger+'%';$('tamed-count').textContent=animals.filter(a=>a.tamed).length;Object.keys(goals).forEach(k=>{let el=document.querySelector('[data-goal="'+k+'"]');if(el)el.classList.toggle('complete',goals[k])});let done=Object.values(goals).filter(Boolean).length;$('quest-progress').textContent=done+' / 4';$('quest-progress-bar').style.width=done*25+'%'}
@@ -121,6 +159,13 @@ window.addEventListener('keydown',e=>{
   if(code==='KeyT')tame();
   if(code==='KeyB')build();
   if(code==='KeyC')craft();
+  if(code==='KeyR')attackEnemy();
+  // Prototype test shortcut: N jumps directly to the next phase, so you can test raids immediately.
+  if(code==='KeyN'){
+    const phase=getDayNightInfo(time);
+    time=Math.floor(time/270)*270+(phase.isDay?180:270);
+    showClock();
+  }
   if(code==='KeyV'){
     zoomTarget=zoomTarget===0?9:0;
     if(zoomTarget!==0){
@@ -140,9 +185,12 @@ const jumpButton=$('jump-button');
 jumpButton.addEventListener('pointerdown',e=>{e.preventDefault();attemptJump()});
 // Click fallback for devices that don't dispatch pointerdown.
 jumpButton.addEventListener('click',e=>{e.preventDefault();attemptJump()});
+$('attack-button').addEventListener('pointerdown',e=>{e.preventDefault();attackEnemy()});
+$('attack-button').addEventListener('click',e=>{e.preventDefault();attackEnemy()});
 // Camera input: drag in third-person or first-person; click in first-person to lock the mouse.
 renderer.domElement.addEventListener('pointerdown',e=>{
   if(e.button!==0&&e.button!==2)return;
+  if(e.button===0)attackEnemy();
   drag=true;lastX=e.clientX;lastY=e.clientY;
   if(zoomTarget===0 && e.button===0 && document.pointerLockElement!==renderer.domElement){
     renderer.domElement.requestPointerLock?.()?.catch?.(()=>{});
@@ -192,6 +240,9 @@ if(jumpVelocity!==0||jumpHeight>0){
 player.position.y=height(player.position.x,player.position.z)+jumpHeight;
 avatar.animate(dt,len>0,keys.has('ShiftLeft')||keys.has('ShiftRight'),jumpHeight>0);
 forest.update(time);
+const phase=getDayNightInfo(time);
+const enemyStatus=threats.update(dt,phase,player,takeEnemyDamage,notify);
+updateThreatUI(phase,enemyStatus);
 for(const a of animals){a.phase+=dt;if(a.tamed){let dx=player.position.x-a.g.position.x,dz=player.position.z-a.g.position.z,d=Math.hypot(dx,dz);if(d>3){a.g.position.x+=dx/d*dt*3;a.g.position.z+=dz/d*dt*3}}else{a.g.position.x+=Math.sin(a.phase)*dt*.25;a.g.position.z+=Math.cos(a.phase*.7)*dt*.25}a.g.position.y=height(a.g.position.x,a.g.position.z)}
 // Smooth camera zoom. Hide the avatar inside first person so the head does not obstruct the view.
 zoomCurrent=THREE.MathUtils.damp(zoomCurrent,zoomTarget,14,dt);

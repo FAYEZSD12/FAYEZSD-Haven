@@ -1,3 +1,28 @@
+// Survival clock: each numbered day has 3 minutes of daylight and 90 seconds of night.
+export const DAY_SECONDS=180, NIGHT_SECONDS=90, CYCLE_SECONDS=DAY_SECONDS+NIGHT_SECONDS;
+const smoothstep=(edge0,edge1,x)=>{
+  const t=Math.max(0,Math.min(1,(x-edge0)/(edge1-edge0)));
+  return t*t*(3-2*t);
+};
+export function getDayNightInfo(elapsedSeconds){
+  const elapsed=Number.isFinite(elapsedSeconds)?Math.max(0,elapsedSeconds):0;
+  const timeInCycle=elapsed%CYCLE_SECONDS;
+  const isDay=timeInCycle<DAY_SECONDS;
+  const cycleNumber=Math.floor(elapsed/CYCLE_SECONDS)+1;
+  const phaseElapsed=isDay?timeInCycle:timeInCycle-DAY_SECONDS;
+  const duration=isDay?DAY_SECONDS:NIGHT_SECONDS;
+  const remainingSeconds=Math.max(0,Math.ceil(duration-phaseElapsed-0.000001));
+  // Fade into nighttime before sunset and fade back into day just before sunrise.
+  const darkness=isDay?smoothstep(DAY_SECONDS-18,DAY_SECONDS,timeInCycle):
+    1-smoothstep(CYCLE_SECONDS-14,CYCLE_SECONDS,timeInCycle);
+  return {
+    isDay, cycleNumber, phase:isDay?'DAY':'NIGHT',
+    remainingSeconds, duration, phaseElapsed,
+    progress:Math.max(0,Math.min(1,phaseElapsed/duration)),
+    darkness, nearSunset:isDay&&remainingSeconds<=20
+  };
+}
+
 // Original procedural low-poly wilderness for FAYEZSD's Haven.
 // Dark pine forest, central campsite, flickering fire, and day/night ambience.
 export function createForestMood(THREE, scene, mesh, mat, height, ground, grass, sun, hemisphere) {
@@ -93,9 +118,8 @@ export function createForestMood(THREE, scene, mesh, mat, height, ground, grass,
   return {
     campfirePosition:campsite,
     update(time) {
-      // Start at sunrise. Transition between day, twilight and eerie blue night.
-      const cycle=(time%250)/250;
-      const night=THREE.MathUtils.smoothstep(-Math.cos(cycle*Math.PI*2),.05,.75);
+      // Use the SAME clock as the HUD so the lighting changes at the exact phase transition.
+      const night=getDayNightInfo(time).darkness;
       currentColor.copy(dayColor).lerp(nightColor,night*.94);
       scene.background.copy(currentColor);
       scene.fog.color.copy(currentColor);

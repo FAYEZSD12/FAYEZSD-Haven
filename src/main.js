@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { createAvatar } from './avatar.js?v=0.5';
 import { createForestMood, getDayNightInfo } from './forest.js?v=0.6';
-import { createNightEnemies } from './enemies.js?v=0.8';
+import { createNightEnemies } from './enemies.js?v=0.9';
 import { RECIPES, BUILDABLE, STATISTICS, canAfford, craftRecipe, createBaseBuilding } from './building.js?v=0.8';
 const $=id=>document.getElementById(id);
 const scene=new THREE.Scene();scene.background=new THREE.Color(0xb9dce8);scene.fog=new THREE.Fog(0xb9dce8,55,155);
@@ -131,9 +131,27 @@ function updateThreatUI(phase,state){
   const readout=$('threat-status');
   const nearCamp=Math.hypot(player.position.x-forest.campfirePosition.x,player.position.z-forest.campfirePosition.z)<threats.SAFE_RADIUS;
   $('safe-zone-state').textContent=nearCamp?'🔥 CAMPFIRE SAFE ZONE · Stalker cannot enter':'⚠ OUTSIDE CAMPFIRE PROTECTION';
-  if(phase.isDay)readout.textContent='☀ Safe daylight · prepare your defenses';
-  else readout.textContent='☾ '+state.raiders+' raider'+(state.raiders===1?'':'s')+' · Stalker '+(state.stalker?'nearby':'gone');
+  const banner=$('raid-banner');
+  banner.classList.toggle('hidden',phase.isDay);
+  if(phase.isDay){
+    readout.textContent='☀ Safe daylight · prepare your defenses';
+  }else{
+    const close=state.closestDistance==null?'searching':state.closestDistance+'m away';
+    readout.textContent='☾ '+state.raiders+' cultist'+(state.raiders===1?'':'s')
+      +' · Wendigo '+(state.stalker?'outside the camp':'gone')+' · Nearest '+close;
+    $('raid-count').textContent=state.raiders+' CULTIST'+(state.raiders===1?'':'S');
+    $('raid-range').textContent=state.closestDistance===null?'':('NEAREST ENEMY '+state.closestDistance+'m');
+  }
   readout.classList.toggle('is-danger',!phase.isDay&&state.raiders>0);
+}
+function skipToNightForTesting(){
+  const phase=getDayNightInfo(time);
+  time=Math.floor(time/270)*270+(phase.isDay?180:270);
+  const newPhase=getDayNightInfo(time);
+  const status=threats.update(0,newPhase,player,takeEnemyDamage,notify);
+  updateThreatUI(newPhase,status);
+  showClock();
+  notify(newPhase.isDay?'Daytime: raiders retreat.':'Night test activated! Look around the camp for glowing cultist torches.');
 }
 function notify(msg){$('toast').textContent=msg;$('toast').classList.add('show');clearTimeout(notify.timer);notify.timer=setTimeout(()=>$('toast').classList.remove('show'),2500)}
 function dist(x,z){return Math.hypot(player.position.x-x,player.position.z-z)}
@@ -241,6 +259,7 @@ $('craft-toggle').onclick=()=>craft();
 $('craft-close').onclick=()=>craft(false);
 $('build-toggle').onclick=()=>buildMenu();
 $('build-close').onclick=()=>buildMenu(false);
+$('night-test-btn').onclick=skipToNightForTesting;
 // Global keyboard handling (including while the hotbar or HUD has focus).
 window.addEventListener('keydown',e=>{
   const code=e.code||(e.key===' '?'Space':e.key);
@@ -260,11 +279,7 @@ window.addEventListener('keydown',e=>{
   if(code==='KeyG')buildMenu();
   if(code==='KeyR')attackEnemy();
   // Prototype test shortcut: N jumps directly to the next phase, so you can test raids immediately.
-  if(code==='KeyN'){
-    const phase=getDayNightInfo(time);
-    time=Math.floor(time/270)*270+(phase.isDay?180:270);
-    showClock();
-  }
+  if(code==='KeyN')skipToNightForTesting();
   if(code==='KeyV'){
     zoomTarget=zoomTarget===0?9:0;
     if(zoomTarget!==0){

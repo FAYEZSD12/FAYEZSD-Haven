@@ -480,13 +480,21 @@ showClock();
 const near=resources.find(r=>r.ready&&dist(r.x,r.z)<3.5);
 const nearWorkstation=base.nearTable(player);
 const nearFire=food.canCook(player);
-$('interaction').classList.toggle('hidden',!near&&!nearWorkstation&&!nearFire);
+const nearAnimal=animals.find(a=>a.alive!==false&&dist(a.g.position.x,a.g.position.z)<4.2);
+const meatNearby=food.getDrops().some(d=>dist(d.x,d.z)<3.4);
+$('interaction').classList.toggle('hidden',!near&&!nearWorkstation&&!nearFire&&!nearAnimal&&!meatNearby);
 if(nearWorkstation){
   $('interaction-title').textContent='Use Crafting Table';
   $('interaction-hint').textContent='Press E or C to craft using your supplies';
 }else if(nearFire){
   $('interaction-title').textContent='Cook Meat at Campfire';
   $('interaction-hint').textContent='Press E • raw '+(inv.raw_meat||0)+' / cooked '+(inv.cooked_meat||0);
+}else if(meatNearby){
+  $('interaction-title').textContent='Raw Meat Dropped';
+  $('interaction-hint').textContent='Walk over the meat to collect it.';
+}else if(nearAnimal){
+  $('interaction-title').textContent='Wild Animal Nearby';
+  $('interaction-hint').textContent='Equip axe (4), face the animal, then click or press R to hunt.';
 }else if(near){
   $('interaction-title').textContent='Gather '+near.type;
   $('interaction-hint').textContent='Press E to collect resources';

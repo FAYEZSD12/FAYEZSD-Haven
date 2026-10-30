@@ -89,3 +89,24 @@
  .material-recipe .recipe-body strong{font-size:13px}
  .resource-pill{font-size:9px}
 }
+
+
+/* v0.9 Night-visibility fix: immediate HUD confirmation for every raid. */
+.raid-banner{position:absolute;top:91px;left:50%;transform:translateX(-50%);
+ width:min(460px,calc(100vw - 34px));padding:12px 18px;z-index:4;
+ background:rgba(55,16,23,.92);border:1px solid #ff9175a8;text-align:center;
+ box-shadow:0 0 30px #ff663a32;pointer-events:none}
+.raid-title{color:#ffd0ae;font-size:13px;font-weight:900;letter-spacing:1.7px}
+.raid-title span{color:#ff8b61}
+.raid-details{display:flex;justify-content:center;gap:20px;flex-wrap:wrap;margin:5px 0}
+.raid-details strong{color:#ffe2a6;font-size:13px}
+.raid-details span{color:#ffe1dc;font-size:12px;align-self:center}
+.raid-banner small{color:#e0b0a3;font-size:10px;line-height:1.45}
+.night-test{border-color:#e0b081aa!important;background:#533c37c9!important}
+.night-test:hover{background:#7a4747e8!important}
+@media(max-width:950px){.raid-banner{top:147px;width:min(360px,calc(100vw - 30px));padding:8px 10px}
+ .raid-title{font-size:11px}
+ .raid-banner small{display:none}}
+@media(max-width:600px){.raid-banner{top:163px}
+ .night-test{font-size:10px}
+ .raid-details{gap:8px}}

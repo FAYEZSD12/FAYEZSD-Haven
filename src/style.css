@@ -110,3 +110,22 @@
 @media(max-width:600px){.raid-banner{top:163px}
  .night-test{font-size:10px}
  .raid-details{gap:8px}}
+
+
+/* v1.0: meat collection and timed cooking at original or player-made campfires. */
+.food-count{font-size:11px;font-weight:800;margin-top:8px;padding:8px;border-radius:8px;background:#1d4235a8;color:#ffd9ba;text-align:center}
+.cook-panel{max-width:520px}
+.cook-inventory{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:20px 0}
+.cook-inventory>div{background:#2a4939;border:1px solid #bda17c80;border-radius:13px;padding:14px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.cook-inventory span{font-size:12px;color:#fae1ba;font-weight:800;letter-spacing:.3px}
+.cook-inventory strong{font-size:27px;color:#fff4e0;font-variant-numeric:tabular-nums}
+.cook-status{font-size:13px;line-height:1.6;color:#e9dabe;margin:12px 0}
+.cook-progress{height:11px;border-radius:10px;background:#0e2520;overflow:hidden;border:1px solid #d5ad7d73}
+.cook-progress>div{height:100%;width:0;background:linear-gradient(90deg,#e77839,#ffc769);transition:width .1s}
+.cook-actions{display:flex;gap:11px;flex-wrap:wrap;margin-top:18px}
+.cook-actions button{flex:1;min-width:180px;font-size:12px;min-height:44px}
+.cook-actions button:disabled{cursor:not-allowed;opacity:.48}
+.cook-warning{padding:11px 12px;background:#4e332b85;border-left:3px solid #e9a66e;border-radius:4px;font-size:12px;line-height:1.6;color:#ffe1ca;margin:16px 0 0}
+.hotbar{overflow-x:auto;overflow-y:hidden;scrollbar-width:thin;scrollbar-color:#8db89c55 transparent}
+.hotbar .slot{flex:0 0 auto}
+@media(max-width:750px){.hotbar{width:calc(100vw - 22px);max-width:calc(100vw - 22px);justify-content:flex-start}.cook-inventory{gap:6px}.cook-inventory>div{padding:10px 9px}.cook-inventory span{font-size:10px}}

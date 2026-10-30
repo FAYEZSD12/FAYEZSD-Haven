@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { createAvatar } from './avatar.js';
 const $=id=>document.getElementById(id);
 const scene=new THREE.Scene();scene.background=new THREE.Color(0xb9dce8);scene.fog=new THREE.Fog(0xb9dce8,55,155);
 const camera=new THREE.PerspectiveCamera(65,innerWidth/innerHeight,.1,250);
@@ -17,7 +18,8 @@ const resources=[],animals=[],structures=[],rand=(a,b)=>a+Math.random()*(b-a);
 function resource(type,x,z){const g=group(x,z);if(type==='tree'){mesh(g,new THREE.CylinderGeometry(.2,.31,2.6,7),brown,0,1.3,0);mesh(g,new THREE.ConeGeometry(1.3,3.3,8),leaves,0,3.2,0)}else if(type==='rock'){mesh(g,new THREE.DodecahedronGeometry(1),stone,0,.7,0,1,.8,1)}else{mesh(g,new THREE.SphereGeometry(1,9,7),leaves,0,.55,0,1.1,.7,1)}resources.push({type,g,x,z,ready:true})}
 for(let i=0;i<115;i++){let x=rand(-104,104),z=rand(-104,104);if(Math.hypot(x,z)<10)continue;resource(i%6===0?'rock':i%5===0?'bush':'tree',x,z)}
 const grass=new THREE.InstancedMesh(new THREE.ConeGeometry(.1,.65,3),mat(0x77a852),1200),dummy=new THREE.Object3D();for(let i=0;i<1200;i++){let x=rand(-105,105),z=rand(-105,105);dummy.position.set(x,height(x,z)+.32,z);dummy.rotation.y=rand(0,6.3);dummy.scale.setScalar(rand(.6,1.5));dummy.updateMatrix();grass.setMatrixAt(i,dummy.matrix)}scene.add(grass);
-const player=group(0,0);mesh(player,new THREE.CylinderGeometry(.34,.37,1.2,8),mat(0x365b50),0,1.1,0);mesh(player,new THREE.SphereGeometry(.29,12,8),mat(0xd0a27d),0,1.96,0);
+const avatar=createAvatar(THREE,scene,camera,mesh,mat,group);
+const player=avatar.player;
 for(let i=0;i<12;i++){let x=rand(-65,65),z=rand(-65,65);let g=group(x,z);mesh(g,new THREE.BoxGeometry(.9,.66,1.6),animalMat,0,.65,0);mesh(g,new THREE.BoxGeometry(.55,.55,.62),animalMat,0,1.06,.9);for(let xx of [-.32,.32])for(let zz of [-.49,.49])mesh(g,new THREE.CylinderGeometry(.1,.1,.6,6),animalMat,xx,.22,zz);animals.push({g,x,z,tamed:false,phase:rand(0,10)})}
 const items=[['rope','Rope','🪢'],['wall','Wall','🧱'],['campfire','Fire','🔥'],['axe','Axe','🪓'],['pickaxe','Pickaxe','⛏️'],['wood','Wood','🪵'],['stone','Stone','🪨'],['fiber','Fiber','🌿'],['berries','Berries','🫐']];
 const inv={rope:1,wall:1,campfire:1,axe:1,pickaxe:1,wood:4,stone:4,fiber:5,berries:3},recipes=[['rope',{fiber:3}],['wall',{wood:4}],['campfire',{wood:2,stone:4}],['axe',{wood:2,stone:2}],['pickaxe',{wood:2,stone:3}]];
@@ -40,7 +42,7 @@ function zoomCamera(deltaY,deltaMode=0){
 const keys=new Set(),goals={gather:false,craft:false,tame:false,build:false};
 function notify(msg){$('toast').textContent=msg;$('toast').classList.add('show');clearTimeout(notify.timer);notify.timer=setTimeout(()=>$('toast').classList.remove('show'),2500)}
 function dist(x,z){return Math.hypot(player.position.x-x,player.position.z-z)}
-function updateUI(){const bar=$('hotbar');bar.innerHTML='';items.forEach(([id,n,emoji],i)=>{let b=document.createElement('button');b.className='slot'+(i===selected?' selected':'');b.innerHTML='<small>'+(i+1)+'</small><span>'+emoji+'</span><strong>'+n+'</strong><em>'+ (inv[id]||0)+'</em>';b.onclick=()=>{selected=i;updateUI()};bar.appendChild(b)});$('health-value').textContent=Math.floor(health);$('hunger-value').textContent=Math.floor(hunger);$('health-fill').style.width=health+'%';$('hunger-fill').style.width=hunger+'%';$('tamed-count').textContent=animals.filter(a=>a.tamed).length;Object.keys(goals).forEach(k=>{let el=document.querySelector('[data-goal="'+k+'"]');if(el)el.classList.toggle('complete',goals[k])});let done=Object.values(goals).filter(Boolean).length;$('quest-progress').textContent=done+' / 4';$('quest-progress-bar').style.width=done*25+'%'}
+function updateUI(){avatar.equip(items[selected]?.[0],inv[items[selected]?.[0]]||0);const bar=$('hotbar');bar.innerHTML='';items.forEach(([id,n,emoji],i)=>{let b=document.createElement('button');b.className='slot'+(i===selected?' selected':'');b.innerHTML='<small>'+(i+1)+'</small><span>'+emoji+'</span><strong>'+n+'</strong><em>'+ (inv[id]||0)+'</em>';b.onclick=()=>{selected=i;updateUI()};bar.appendChild(b)});$('health-value').textContent=Math.floor(health);$('hunger-value').textContent=Math.floor(hunger);$('health-fill').style.width=health+'%';$('hunger-fill').style.width=hunger+'%';$('tamed-count').textContent=animals.filter(a=>a.tamed).length;Object.keys(goals).forEach(k=>{let el=document.querySelector('[data-goal="'+k+'"]');if(el)el.classList.toggle('complete',goals[k])});let done=Object.values(goals).filter(Boolean).length;$('quest-progress').textContent=done+' / 4';$('quest-progress-bar').style.width=done*25+'%'}
 function gather(){let r=resources.filter(r=>r.ready&&dist(r.x,r.z)<3.5).sort((a,b)=>dist(a.x,a.z)-dist(b.x,b.z))[0];if(!r)return notify('Get closer to a tree, rock or bush');let id=r.type==='tree'?'wood':r.type==='rock'?'stone':'fiber';inv[id]=(inv[id]||0)+(r.type==='tree'?3:2);if(r.type==='bush')inv.berries++;r.ready=false;r.g.visible=false;setTimeout(()=>{r.ready=true;r.g.visible=true},20000);goals.gather=true;notify('Collected '+id);updateUI()}
 function tame(){let a=animals.filter(a=>!a.tamed&&dist(a.x,a.z)<4).sort((a,b)=>dist(a.x,a.z)-dist(b.x,b.z))[0];if(!a)return notify('Approach an untamed animal');if(!inv.rope)return notify('Craft a rope first');inv.rope--;a.tamed=true;goals.tame=true;notify('Animal tamed! It will follow you.');updateUI()}
 function build(){let type=items[selected][0];if(!['wall','campfire'].includes(type))return notify('Select a wall or campfire in the hotbar');if(!inv[type])return notify('Craft this structure first');inv[type]--;let angle=yaw,g=group(player.position.x+Math.sin(angle)*3,player.position.z+Math.cos(angle)*3);if(type==='wall')mesh(g,new THREE.BoxGeometry(3,2,.35),brown,0,1,0);else{mesh(g,new THREE.CylinderGeometry(.65,.7,.25,10),stone,0,.15,0);mesh(g,new THREE.ConeGeometry(.4,1,8),mat(0xf58c2a),0,.75,0)}structures.push({type,x:g.position.x,z:g.position.z});goals.build=true;notify(type+' placed');updateUI()}
@@ -95,11 +97,12 @@ if(len){
   player.rotation.y=yaw;
 }
 player.position.y=height(player.position.x,player.position.z);
+avatar.animate(dt,len>0,keys.has('ShiftLeft'));
 for(const a of animals){a.phase+=dt;if(a.tamed){let dx=player.position.x-a.g.position.x,dz=player.position.z-a.g.position.z,d=Math.hypot(dx,dz);if(d>3){a.g.position.x+=dx/d*dt*3;a.g.position.z+=dz/d*dt*3}}else{a.g.position.x+=Math.sin(a.phase)*dt*.25;a.g.position.z+=Math.cos(a.phase*.7)*dt*.25}a.g.position.y=height(a.g.position.x,a.g.position.z)}
 // Smooth camera zoom. Hide the avatar inside first person so the head does not obstruct the view.
 zoomCurrent=THREE.MathUtils.damp(zoomCurrent,zoomTarget,14,dt);
 const firstPerson=zoomCurrent<.45;
-player.visible=!firstPerson;
+avatar.setFirstPerson(firstPerson);
 if(zoomTarget!==0 && document.pointerLockElement===renderer.domElement)document.exitPointerLock?.();
 const target=player.position.clone().add(new THREE.Vector3(0,1.85,0));
 if(firstPerson){

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { createAvatar } from './avatar.js?v=1.1';
-import { createForestMood, getDayNightInfo } from './forest.js?v=0.6';
-import { createNightEnemies } from './enemies.js?v=1.1';
+import { createForestMood, getDayNightInfo } from './forest.js?v=1.3';
+import { createNightEnemies } from './enemies.js?v=1.3';
 import { createHuntingAndCooking } from './hunting.js?v=1.1';
 import { FIREARMS,isFirearm,tryFire } from './weapons.js?v=1.1';
 import { RECIPES, BUILDABLE, STATISTICS, canAfford, craftRecipe, createBaseBuilding } from './building.js?v=1.3';

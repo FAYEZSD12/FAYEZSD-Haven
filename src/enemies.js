@@ -143,13 +143,14 @@ export function createNightEnemies(THREE, scene, mesh, mat, height, camp, defens
             // camp furniture, and boulders; raiders must walk around them.
             if(collisions){
               const radius=isStalker?.55:.42;
-              let next=collisions.move(x,z,nx-x,nz-z,radius);
+              const solidBuilding=(xx,zz,r)=>defenses?.solidAt?.(xx,zz,r)||null;
+              let next=collisions.move(x,z,nx-x,nz-z,radius,solidBuilding);
               const progress=Math.hypot(next.x-x,next.z-z);
               if(progress<amount*.35){
                 const vx=(tx-x)/moveDistance,vz=(tz-z)/moveDistance;
                 const side=e.index%2===0?1:-1;
-                const left=collisions.move(x,z,-vz*amount*side,vx*amount*side,radius);
-                const right=collisions.move(x,z,vz*amount*side,-vx*amount*side,radius);
+                const left=collisions.move(x,z,-vz*amount*side,vx*amount*side,radius,solidBuilding);
+                const right=collisions.move(x,z,vz*amount*side,-vx*amount*side,radius,solidBuilding);
                 const ld=Math.hypot(left.x-x,left.z-z),rd=Math.hypot(right.x-x,right.z-z);
                 next=ld>=rd?left:right;
               }

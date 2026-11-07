@@ -609,7 +609,12 @@ for(const a of animals){
     dx=Math.sin(a.phase)*dt*.25;
     dz=Math.cos(a.phase*.7)*dt*.25;
   }
-  const next=collisions.move(a.g.position.x,a.g.position.z,dx,dz,.64,(x,z,r)=>base.solidAt(x,z,r));
+  const next=collisions.move(a.g.position.x,a.g.position.z,dx,dz,.64,(x,z,r)=>{
+    if(base.solidAt(x,z,r))return {tag:'built structure'};
+    if(Math.hypot(x-player.position.x,z-player.position.z)<r+PLAYER_RADIUS+.12)
+      return {tag:'player'};
+    return null;
+  });
   a.g.position.x=next.x;a.g.position.z=next.z;
   a.g.position.y=height(next.x,next.z);
 }

@@ -156,12 +156,8 @@ function zoomCamera(deltaY,deltaMode=0){
 // The static collision world covers trees, rocks, bushes, pines, mushrooms,
 // benches, crates, tent, main fire, and the workbench.
 function dynamicBlocker(x,z,r){
-  const builtWall=base.collidesAt(x,z,r);
-  if(builtWall)return builtWall;
-  for(const structure of base.structures){
-    if(structure.type!=='campfire')continue;
-    if(Math.hypot(x-structure.x,z-structure.z)<r+.82)return {tag:'portable campfire'};
-  }
+  const builtSolid=base.solidAt(x,z,r);
+  if(builtSolid)return builtSolid;
   for(const animal of animals){
     if(animal.alive===false)continue;
     if(Math.hypot(x-animal.g.position.x,z-animal.g.position.z)<r+.72)return {tag:'wild animal'};
@@ -613,7 +609,7 @@ for(const a of animals){
     dx=Math.sin(a.phase)*dt*.25;
     dz=Math.cos(a.phase*.7)*dt*.25;
   }
-  const next=collisions.move(a.g.position.x,a.g.position.z,dx,dz,.64,(x,z,r)=>base.collidesAt(x,z,r));
+  const next=collisions.move(a.g.position.x,a.g.position.z,dx,dz,.64,(x,z,r)=>base.solidAt(x,z,r));
   a.g.position.x=next.x;a.g.position.z=next.z;
   a.g.position.y=height(next.x,next.z);
 }

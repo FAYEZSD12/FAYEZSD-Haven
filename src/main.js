@@ -49,7 +49,7 @@ function resource(type,x,z){
   const resourceObj={type,g,x,z,ready:true};
   resources.push(resourceObj);
   // When harvested, the resource vanishes, so its solid boundary does too.
-  collisions.addCircle(x,z,radius,{tag:type,active:()=>resourceObj.ready});
+  resourceObj.collider=collisions.addCircle(x,z,radius,{tag:type,active:()=>resourceObj.ready});
 }
 for(let i=0;i<115;i++){let x=rand(-104,104),z=rand(-104,104);if(Math.hypot(x,z)<10||Math.hypot(x,z-13)<11)continue;resource(i%6===0?'rock':i%5===0?'bush':'tree',x,z)}
 // Reliable first-play targets: accessible tree, stone and bush just beyond the camp clearing.
@@ -308,7 +308,14 @@ function gather(target=null){
   inv[id]=(inv[id]||0)+(r.type==='tree'?3:2);
   if(r.type==='bush')inv.berries++;
   r.ready=false;r.g.visible=false;
-  setTimeout(()=>{r.ready=true;r.g.visible=true},20000);
+  function regrowWhenClear(){
+    // Don't materialize a new tree/rock/bush around the player's body.
+    const occupied=Math.hypot(player.position.x-r.x,player.position.z-r.z)
+      <r.collider.radius+PLAYER_RADIUS+.15;
+    if(occupied){setTimeout(regrowWhenClear,2500);return;}
+    r.ready=true;r.g.visible=true;
+  }
+  setTimeout(regrowWhenClear,20000);
   goals.gather=true;
   notify('Collected '+(r.type==='tree'?3:2)+' '+id+'!');updateUI();return true;
 }

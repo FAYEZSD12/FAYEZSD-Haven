@@ -1,6 +1,6 @@
 // Original procedural nighttime threats for FAYEZSD's Haven.
 // The Stag Shadow cannot cross the CAMPFIRE sanctuary; cultist raiders CAN.
-export function createNightEnemies(THREE, scene, mesh, mat, height, camp, defenses=null) {
+export function createNightEnemies(THREE, scene, mesh, mat, height, camp, defenses=null, collisions=null) {
   const SAFE_RADIUS=9;
   const enemies=[];
   const dark=mat(0x222b2d),horn=mat(0x94836c),red= new THREE.MeshBasicMaterial({color:0xff5b48});
@@ -15,7 +15,8 @@ export function createNightEnemies(THREE, scene, mesh, mat, height, camp, defens
   function distance(x,z,xx,zz){return Math.hypot(x-xx,z-zz)}
   function makeEnemy(kind,x,z,index) {
     const root=new THREE.Group();
-    root.position.set(x,height(x,z),z);
+    const start=collisions?.findFree(x,z,kind==='stalker'?.55:.43) || {x,z};
+    root.position.set(start.x,height(start.x,start.z),start.z);
     scene.add(root);
     const visual=new THREE.Group();root.add(visual);
     if(kind==='stalker'){
@@ -138,7 +139,24 @@ export function createNightEnemies(THREE, scene, mesh, mat, height, camp, defens
               if(broken)onAlert?.(blocker.type+' defense destroyed!');
             }
           }else{
-            positionAt(e,nx,nz);
+            // Wildlife and players aren't the only ones stopped by trees,
+            // camp furniture, and boulders; raiders must walk around them.
+            if(collisions){
+              const radius=isStalker?.55:.42;
+              let next=collisions.move(x,z,nx-x,nz-z,radius);
+              const progress=Math.hypot(next.x-x,next.z-z);
+              if(progress<amount*.35){
+                const vx=(tx-x)/moveDistance,vz=(tz-z)/moveDistance;
+                const side=e.index%2===0?1:-1;
+                const left=collisions.move(x,z,-vz*amount*side,vx*amount*side,radius);
+                const right=collisions.move(x,z,vz*amount*side,-vx*amount*side,radius);
+                const ld=Math.hypot(left.x-x,left.z-z),rd=Math.hypot(right.x-x,right.z-z);
+                next=ld>=rd?left:right;
+              }
+              // A stalker still cannot enter the protected campfire circle.
+              if(!isStalker||Math.hypot(next.x-camp.x,next.z-camp.z)>=SAFE_RADIUS+.8)
+                positionAt(e,next.x,next.z);
+            }else positionAt(e,nx,nz);
           }
         }
       }

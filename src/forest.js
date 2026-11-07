@@ -25,7 +25,7 @@ export function getDayNightInfo(elapsedSeconds){
 
 // Original procedural low-poly wilderness for FAYEZSD's Haven.
 // Dark pine forest, central campsite, flickering fire, and day/night ambience.
-export function createForestMood(THREE, scene, mesh, mat, height, ground, grass, sun, hemisphere) {
+export function createForestMood(THREE, scene, mesh, mat, height, ground, grass, sun, hemisphere, collisions=null) {
   const pineA=mat(0x214c3a), pineB=mat(0x2b6649), pineC=mat(0x153d31);
   const bark=mat(0x513a29), dirt=mat(0x6d6242), slate=mat(0x566263);
   const lightWood=mat(0x92744a), canvas=mat(0x987a47), darkCanvas=mat(0x514e43);
@@ -39,6 +39,7 @@ export function createForestMood(THREE, scene, mesh, mat, height, ground, grass,
     g.position.set(x,height(x,z),z);
     g.scale.setScalar(scale);
     parent.add(g);
+    collisions?.addCircle(x,z,.34*scale,{tag:'pine trunk'});
     mesh(g,new THREE.CylinderGeometry(.17,.31,3.25,6),bark,0,1.62,0);
     for(let i=0;i<4;i++){
       const tier=mesh(g,new THREE.ConeGeometry(1.6-i*.24,2.05,7),[pineA,pineB,pineA,pineC][i],0,2.55+i*.68,0);
@@ -50,12 +51,14 @@ export function createForestMood(THREE, scene, mesh, mat, height, ground, grass,
     const g=new THREE.Group();
     g.position.set(x,height(x,z),z);
     parent.add(g);
+    collisions?.addCircle(x,z,.77*s,{tag:'forest rock'});
     const stone=mesh(g,new THREE.DodecahedronGeometry(s,0),slate,0,s*.57,0,1,.65,.86);
     stone.rotation.y=(x+z)*.1;
     return g;
   }
   // The clearing provides a recognizable safe home base without using copied assets.
   const camp=new THREE.Group();camp.position.set(campsite.x,height(0,campsite.z)+.07,campsite.z);scene.add(camp);
+  collisions?.addCircle(campsite.x,campsite.z,1.07,{tag:'central campfire'});
   const clearing=mesh(camp,new THREE.CircleGeometry(8,36),dirt,0,.015,0);
   clearing.rotation.x=-Math.PI/2;
   clearing.receiveShadow=true;
@@ -82,15 +85,18 @@ export function createForestMood(THREE, scene, mesh, mat, height, ground, grass,
   for(let side of [-1,1]){
     const bench=mesh(camp,new THREE.CylinderGeometry(.36,.36,3.4,8),bark,side*3,.43,1.4);
     bench.rotation.z=Math.PI/2;
+    collisions?.addBox(campsite.x+side*3,campsite.z+1.4,3.4,.7,0,{tag:'log bench'});
   }
   for(let i=0;i<3;i++){
     const b=mesh(camp,new THREE.BoxGeometry(.92,.84,.92),lightWood,4.6+i*.8,.44,-1.9+i*.15);
     b.rotation.y=i*.28;
     mesh(camp,new THREE.BoxGeometry(.96,.08,.95),bark,4.6+i*.8,.85,-1.9+i*.15);
+    collisions?.addBox(campsite.x+4.6+i*.8,campsite.z-1.9+i*.15,.97,.96,i*.28,{tag:'supply crate'});
   }
   // Small stylized tent, with a dark doorway.
   const tent=new THREE.Group();
   tent.position.set(-4.4,0,-2.5);camp.add(tent);
+  collisions?.addCircle(campsite.x-4.4,campsite.z-2.5,1.8,{tag:'camp tent'});
   const tentBody=mesh(tent,new THREE.ConeGeometry(2,2.65,4),canvas,0,1.32,0);
   tentBody.rotation.y=Math.PI/4;
   mesh(tent,new THREE.BoxGeometry(1.0,1.55,.12),darkCanvas,0,.8,1.22);
@@ -107,6 +113,7 @@ export function createForestMood(THREE, scene, mesh, mat, height, ground, grass,
     const x=((i*19.73)%174)-87,z=((i*31.17)%170)-85;
     if(Math.hypot(x,z-campsite.z)<9)continue;
     const g=new THREE.Group();g.position.set(x,height(x,z),z);scene.add(g);
+    collisions?.addCircle(x,z,.16,{tag:'mushroom'});
     mesh(g,new THREE.CylinderGeometry(.045,.055,.24,5),mushroomStem,0,.12,0);
     mesh(g,new THREE.ConeGeometry(.19,.17,6),mushroomTop,0,.29,0);
   }

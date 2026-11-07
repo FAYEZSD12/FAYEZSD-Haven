@@ -68,6 +68,31 @@ const inv={rope:1,wall:1,reinforced:0,spikes:0,campfire:1,axe:1,pickaxe:1,wood:4
 const food=createHuntingAndCooking(THREE,scene,mesh,mat,height,animals,inv,base,forest.campfirePosition);
 let buildChoice='wall';
 let selected=3,health=100,hunger=100,time=0,yaw=0,pitch=.45,drag=false,lastX=0,lastY=0; // Start with the axe equipped.
+// Use elapsed real-world milliseconds rather than animation frames for survival time.
+// requestAnimationFrame is normally paused/throttled in background tabs; Date.now() is not.
+let lastClockSampleMs=Date.now();
+function advanceGameClock(){
+  const sampleMs=Date.now();
+  const elapsed=Math.max(0,(sampleMs-lastClockSampleMs)/1000);
+  lastClockSampleMs=sampleMs;
+  if(elapsed>0){
+    time+=elapsed;
+    // Food finishes cooking even if the player switches tabs while waiting.
+    if(food.updateCooking(elapsed)){
+      notify('🍖 Meat finished cooking! Eat it with F or at the campfire.');
+      updateUI();
+    }
+  }
+  return elapsed;
+}
+function refreshClockDisplay(){
+  advanceGameClock();
+  forest.update(time);
+  showClock();
+  // On returning from a different browser tab, the game loop will resume enemy
+  // simulation at the correct phase. No surprise combat damage while hidden.
+  if(!$('cook-backdrop').classList.contains('hidden'))showCookingStatus();
+}
 let jumpHeight=0,jumpVelocity=0; // The character's airborne height above the terrain.
 let jumpHeld=false;
 const JUMP_SPEED=10.5,GRAVITY=25;
@@ -366,6 +391,7 @@ function eatFood(item=''){
 }
 function save(){
   try{
+    advanceGameClock();
     localStorage.setItem('fayez-haven-v1',JSON.stringify({
       inv,selected,starterAxeGiven:true,health,hunger,time,goals,x:player.position.x,z:player.position.z,
       structures:base.exportStructures(),buildChoice,
@@ -446,6 +472,10 @@ window.addEventListener('keyup',e=>{
   if(code==='Space'||e.key===' '||e.key==='Spacebar')jumpHeld=false;
 });
 window.addEventListener('blur',()=>{keys.clear();jumpHeld=false});
+// A visibility/focus event refreshes the countdown without waiting for a frame.
+// The elapsed time still comes from Date.now(), so tab throttling cannot freeze it.
+document.addEventListener('visibilitychange',refreshClockDisplay);
+window.addEventListener('focus',refreshClockDisplay);
 const jumpButton=$('jump-button');
 jumpButton.addEventListener('pointerdown',e=>{e.preventDefault();attemptJump()});
 // Click fallback for devices that don't dispatch pointerdown.
@@ -481,8 +511,17 @@ window.addEventListener('wheel',e=>{
   zoomCamera(e.deltaY,e.deltaMode);
 },{passive:false,capture:true});
 addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)});
-load();updateUI();showClock();let prev=performance.now();
-function animate(now){requestAnimationFrame(animate);const dt=Math.min((now-prev)/1000,.05);prev=now;time+=dt;hunger=Math.max(0,hunger-dt*.06);if(hunger===0)health=Math.max(0,health-dt*.25);
+load();
+lastClockSampleMs=Date.now(); // Begin measuring elapsed time from the loaded save state.
+updateUI();showClock();
+let prev=performance.now();
+function animate(now){
+  requestAnimationFrame(animate);
+  const dt=Math.max(0,Math.min((now-prev)/1000,.05)); // Physics only: no giant jump after tab switch.
+  prev=now;
+  advanceGameClock(); // The day/night timer catches up fully after any inactive period.
+  hunger=Math.max(0,hunger-dt*.06);
+  if(hunger===0)health=Math.max(0,health-dt*.25);
 // Movement uses the same camera basis as the view: D points screen-right, A screen-left.
 let forward=(keys.has('KeyW')?1:0)-(keys.has('KeyS')?1:0);
 let strafe=(keys.has('KeyD')?1:0)-(keys.has('KeyA')?1:0);
@@ -526,7 +565,7 @@ for(const a of animals){
 }
 const collectedMeat=food.updateDrops(dt,time,player);
 if(collectedMeat>0){notify('Collected '+collectedMeat+' raw meat! Go to campfire to cook it.');updateUI();}
-if(food.updateCooking(dt)){notify('🍖 Meat finished cooking! Eat it with F or at the campfire.');updateUI();}
+// Cooking advances in advanceGameClock() using real elapsed time.
 if(!$('cook-backdrop').classList.contains('hidden'))showCookingStatus();
 // Smooth camera zoom. Hide the avatar inside first person so the head does not obstruct the view.
 zoomCurrent=THREE.MathUtils.damp(zoomCurrent,zoomTarget,14,dt);

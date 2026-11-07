@@ -32,12 +32,13 @@ export function craftRecipe(recipe,inv){
   if(['revolver','rifle','sniper'].includes(recipe.id))inv.ammo=(inv.ammo||0)+6;
   return true;
 }
-export function createBaseBuilding(THREE,scene,mesh,mat,height,camp){
+export function createBaseBuilding(THREE,scene,mesh,mat,height,camp,collisions=null){
   const wood=mat(0x815a39),darkWood=mat(0x483425),iron=mat(0x798e90),
     rock=mat(0x81847e),straw=mat(0xb6a06a),fire=new THREE.MeshBasicMaterial({color:0xff9f3c}),
     glow=new THREE.MeshBasicMaterial({color:0xf5df9e});
   const workbench={x:camp.x+4,z:camp.z+3};
   const table=new THREE.Group();table.position.set(workbench.x,height(workbench.x,workbench.z),workbench.z);scene.add(table);
+  collisions?.addBox(workbench.x,workbench.z,2.25,1.35,0,{tag:'crafting workbench'});
   // Worktable with 4 sturdy legs, top planks, shelves, hammer, and a visible small lantern.
   for(const x of [-.93,.93])for(const z of [-.45,.45]){
     mesh(table,new THREE.BoxGeometry(.18,.93,.18),darkWood,x,.47,z);

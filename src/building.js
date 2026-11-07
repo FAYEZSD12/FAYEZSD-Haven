@@ -107,6 +107,18 @@ export function createBaseBuilding(THREE,scene,mesh,mat,height,camp,collisions=n
     if(Math.hypot(x-workbench.x,z-workbench.z)<2.6)return {ok:false,reason:'Too close to the crafting table'};
     if(Math.hypot(x-camp.x,z-camp.z)<2.1)return {ok:false,reason:'Too close to the central campfire'};
     if(structures.some(item=>Math.hypot(item.x-x,item.z-z)<2.7))return {ok:false,reason:'Too close to another structure'};
+    // Sample the actual footprint of the proposed structure, not just its center.
+    // Do not permit walls or fire pits to intersect trees, boulders or camp props.
+    if(collisions){
+      const spec=STATISTICS[type];
+      const c=Math.cos(yaw),sn=Math.sin(yaw);
+      for(const offset of [-spec.width*.43,0,spec.width*.43]){
+        const checkX=x+c*offset,checkZ=z-sn*offset;
+        if(collisions.collidesAt(checkX,checkZ,.38)){
+          return {ok:false,reason:'Clear trees, rocks, or camp objects before building here'};
+        }
+      }
+    }
     const item=createVisual(type,x,z,yaw,STATISTICS[type].hp);
     return {ok:true,item};
   }

@@ -4,7 +4,8 @@ import { createForestMood, getDayNightInfo } from './forest.js?v=0.6';
 import { createNightEnemies } from './enemies.js?v=1.1';
 import { createHuntingAndCooking } from './hunting.js?v=1.1';
 import { FIREARMS,isFirearm,tryFire } from './weapons.js?v=1.1';
-import { RECIPES, BUILDABLE, STATISTICS, canAfford, craftRecipe, createBaseBuilding } from './building.js?v=1.1';
+import { RECIPES, BUILDABLE, STATISTICS, canAfford, craftRecipe, createBaseBuilding } from './building.js?v=1.3';
+import { createCollisionWorld } from './collisions.js?v=1.3';
 const $=id=>document.getElementById(id);
 const scene=new THREE.Scene();scene.background=new THREE.Color(0xb9dce8);scene.fog=new THREE.Fog(0xb9dce8,55,155);
 const camera=new THREE.PerspectiveCamera(65,innerWidth/innerHeight,.1,250);
@@ -21,25 +22,34 @@ const ground=new THREE.Mesh(groundGeo,green);ground.receiveShadow=true;scene.add
 function mesh(parent,geo,m,x,y,z,sx=1,sy=1,sz=1){const o=new THREE.Mesh(geo,m);o.position.set(x,y,z);o.scale.set(sx,sy,sz);o.castShadow=true;parent.add(o);return o}
 function group(x,z){let g=new THREE.Group();g.position.set(x,height(x,z),z);scene.add(g);return g}
 const resources=[],animals=[],rand=(a,b)=>a+Math.random()*(b-a);
+const collisions=createCollisionWorld(); // One shared collision world for every solid object.
+const PLAYER_RADIUS=.34;
 function resource(type,x,z){
   const g=group(x,z);
+  let radius=.75;
   if(type==='tree'){
     const size=.8+((Math.abs(x+z)*.071)%1)*.55;
     g.scale.setScalar(size);
+    radius=.33*size;
     mesh(g,new THREE.CylinderGeometry(.19,.32,3.1,7),brown,0,1.55,0);
     for(let i=0;i<4;i++){
       const branch=mesh(g,new THREE.ConeGeometry(1.52-i*.22,1.85,7),treeShade[i%3],0,2.45+i*.64,0);
       branch.rotation.y=i*.28;
     }
   }else if(type==='rock'){
+    radius=.82;
     const r=mesh(g,new THREE.DodecahedronGeometry(.95,0),stone,0,.62,0,1,.7,.9);
     r.rotation.y=x*.13;
   }else{
+    radius=.79;
     for(const dx of [-.38,0,.38]){
       mesh(g,new THREE.IcosahedronGeometry(.52,0),leaves,dx,.52,0);
     }
   }
-  resources.push({type,g,x,z,ready:true});
+  const resourceObj={type,g,x,z,ready:true};
+  resources.push(resourceObj);
+  // When harvested, the resource vanishes, so its solid boundary does too.
+  collisions.addCircle(x,z,radius,{tag:type,active:()=>resourceObj.ready});
 }
 for(let i=0;i<115;i++){let x=rand(-104,104),z=rand(-104,104);if(Math.hypot(x,z)<10||Math.hypot(x,z-13)<11)continue;resource(i%6===0?'rock':i%5===0?'bush':'tree',x,z)}
 // Reliable first-play targets: accessible tree, stone and bush just beyond the camp clearing.
@@ -47,13 +57,13 @@ resource('tree',2,27);
 resource('rock',6,27);
 resource('bush',-2,26);
 const grass=new THREE.InstancedMesh(new THREE.ConeGeometry(.1,.65,3),mat(0x44844d),1200),dummy=new THREE.Object3D();for(let i=0;i<1200;i++){let x=rand(-105,105),z=rand(-105,105);dummy.position.set(x,height(x,z)+.32,z);dummy.rotation.y=rand(0,6.3);dummy.scale.setScalar(Math.hypot(x,z-13)<8?.001:rand(.6,1.5));dummy.updateMatrix();grass.setMatrixAt(i,dummy.matrix)}scene.add(grass);
-const forest=createForestMood(THREE,scene,mesh,mat,height,ground,grass,sun,hemisphere);
+const forest=createForestMood(THREE,scene,mesh,mat,height,ground,grass,sun,hemisphere,collisions);
 const avatar=createAvatar(THREE,scene,camera,mesh,mat,group);
 const player=avatar.player;
 // New players begin close to the campfire. An existing save restores their last position.
-player.position.set(2,height(2,14),14); // Spawn within reach of the crafting table.
-const base=createBaseBuilding(THREE,scene,mesh,mat,height,forest.campfirePosition);
-const threats=createNightEnemies(THREE,scene,mesh,mat,height,forest.campfirePosition,base);
+player.position.set(0,height(0,16.5),16.5); // Open space between the fire and nearby camp benches.
+const base=createBaseBuilding(THREE,scene,mesh,mat,height,forest.campfirePosition,collisions);
+const threats=createNightEnemies(THREE,scene,mesh,mat,height,forest.campfirePosition,base,collisions);
 for(let i=0;i<12;i++){
   // The first animal is intentionally close to the starting campsite to test hunting immediately.
   let x=i===0?2:rand(-65,65),z=i===0?19:rand(-65,65);
@@ -61,7 +71,9 @@ for(let i=0;i<12;i++){
   mesh(g,new THREE.BoxGeometry(.9,.66,1.6),animalMat,0,.65,0);
   mesh(g,new THREE.BoxGeometry(.55,.55,.62),animalMat,0,1.06,.9);
   for(let xx of [-.32,.32])for(let zz of [-.49,.49])mesh(g,new THREE.CylinderGeometry(.1,.1,.6,6),animalMat,xx,.22,zz);
-  animals.push({g,x,z,tamed:false,phase:rand(0,10),alive:true,hp:2});
+  const animalSafe=collisions.findFree(x,z,.68,(xx,zz,r)=>base.collidesAt(xx,zz,r));
+  g.position.x=animalSafe.x;g.position.z=animalSafe.z;g.position.y=height(animalSafe.x,animalSafe.z);
+  animals.push({g,x:animalSafe.x,z:animalSafe.z,tamed:false,phase:rand(0,10),alive:true,hp:2});
 }
 const items=[['rope','Rope','🪢'],['wall','Wall','🧱'],['campfire','Fire','🔥'],['axe','Axe','🪓'],['pickaxe','Pickaxe','⛏️'],['wood','Wood','🪵'],['stone','Stone','🪨'],['fiber','Fiber','🌿'],['berries','Berries','🫐'],['raw_meat','Raw Meat','🥩'],['cooked_meat','Cooked Meat','🍖'],['revolver','Revolver','🔫'],['rifle','Rifle','🔫'],['sniper','Sniper','🎯']];
 const inv={rope:1,wall:1,reinforced:0,spikes:0,campfire:1,axe:1,pickaxe:1,wood:4,stone:4,fiber:5,berries:3,raw_meat:0,cooked_meat:0,revolver:0,rifle:0,sniper:0,ammo:0};
@@ -140,6 +152,33 @@ function zoomCamera(deltaY,deltaMode=0){
   }
   if(zoomTarget!==0)pitch=Math.max(.08,pitch);
 }
+// Dynamic blockers include animals, raiders, and player-built campfires.
+// The static collision world covers trees, rocks, bushes, pines, mushrooms,
+// benches, crates, tent, main fire, and the workbench.
+function dynamicBlocker(x,z,r){
+  const builtWall=base.collidesAt(x,z,r);
+  if(builtWall)return builtWall;
+  for(const structure of base.structures){
+    if(structure.type!=='campfire')continue;
+    if(Math.hypot(x-structure.x,z-structure.z)<r+.82)return {tag:'portable campfire'};
+  }
+  for(const animal of animals){
+    if(animal.alive===false)continue;
+    if(Math.hypot(x-animal.g.position.x,z-animal.g.position.z)<r+.72)return {tag:'wild animal'};
+  }
+  for(const enemy of threats.getEnemies()){
+    if(!enemy.alive)continue;
+    const radius=enemy.kind==='stalker'?.62:.44;
+    if(Math.hypot(x-enemy.root.position.x,z-enemy.root.position.z)<r+radius)
+      return {tag:enemy.kind==='stalker'?'Forest Stalker':'cultist'};
+  }
+  return null;
+}
+function clearPlayerFromSolids(){
+  const safe=collisions.findFree(player.position.x,player.position.z,PLAYER_RADIUS,dynamicBlocker);
+  player.position.x=safe.x;player.position.z=safe.z;
+  player.position.y=height(safe.x,safe.z);
+}
 const keys=new Set(),goals={gather:false,craft:false,tame:false,build:false};
 let lastAttackTime=-10,lastShotTime=-10;
 function selectTool(id){
@@ -198,7 +237,8 @@ function takeEnemyDamage(amount,attacker){
     const currentNight=getDayNightInfo(time).cycleNumber;
     time=currentNight*270;
     threats.despawn();
-    player.position.set(2,height(2,forest.campfirePosition.z+1),forest.campfirePosition.z+1);
+    player.position.set(0,height(0,forest.campfirePosition.z+3.5),forest.campfirePosition.z+3.5);
+    clearPlayerFromSolids();
     health=100;hunger=Math.max(hunger,60);
     jumpHeight=0;jumpVelocity=0;
     notify('You were defeated by '+attacker+'. Respawned at camp for a new day.');
@@ -416,6 +456,8 @@ function load(){
     base.restore(saved.structures);
     food.restoreState(saved.hunting);
     for(const i of (saved.tamed||[]))if(animals[i]&&animals[i].alive!==false)animals[i].tamed=true;
+    // Migrate older saved locations that may overlap the new solid boundaries.
+    clearPlayerFromSolids();
     notify('Previous save and defenses loaded');
   }catch(e){console.warn(e);}
 }
@@ -512,6 +554,7 @@ window.addEventListener('wheel',e=>{
 },{passive:false,capture:true});
 addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)});
 load();
+clearPlayerFromSolids();
 lastClockSampleMs=Date.now(); // Begin measuring elapsed time from the loaded save state.
 updateUI();showClock();
 let prev=performance.now();
@@ -531,12 +574,13 @@ if(len){
   const speed=keys.has('ShiftLeft')?9:5.5;
   const facingX=Math.sin(yaw),facingZ=Math.cos(yaw);
   const cameraRightX=-facingZ,cameraRightZ=facingX;
-  const nextX=THREE.MathUtils.clamp(player.position.x+(facingX*forward+cameraRightX*strafe)*speed*dt,-108,108);
-  const nextZ=THREE.MathUtils.clamp(player.position.z+(facingZ*forward+cameraRightZ*strafe)*speed*dt,-108,108);
-  // Solid defensive walls stop the player as well as cultists. Test each axis so
-  // the player can slide along a wall instead of getting stuck on corners.
-  if(!base.collidesAt(nextX,player.position.z,.29))player.position.x=nextX;
-  if(!base.collidesAt(player.position.x,nextZ,.29))player.position.z=nextZ;
+  const dx=(facingX*forward+cameraRightX*strafe)*speed*dt;
+  const dz=(facingZ*forward+cameraRightZ*strafe)*speed*dt;
+  // Swept collision against every world object, current enemies, and defenses.
+  // Slide along walls without ever tunneling through at sprint speeds.
+  const moved=collisions.move(player.position.x,player.position.z,dx,dz,PLAYER_RADIUS,dynamicBlocker);
+  player.position.x=moved.x;
+  player.position.z=moved.z;
   player.rotation.y=yaw;
 }
 // Ground-locked vertical motion: begin at launch velocity, then accelerate downward.
@@ -554,14 +598,17 @@ updateThreatUI(phase,enemyStatus);
 for(const a of animals){
   if(a.alive===false)continue; // A hunted animal cannot move, be tamed, or reappear.
   a.phase+=dt;
+  let dx=0,dz=0;
   if(a.tamed){
-    const dx=player.position.x-a.g.position.x,dz=player.position.z-a.g.position.z,d=Math.hypot(dx,dz);
-    if(d>3){a.g.position.x+=dx/d*dt*3;a.g.position.z+=dz/d*dt*3}
+    const toX=player.position.x-a.g.position.x,toZ=player.position.z-a.g.position.z,d=Math.hypot(toX,toZ);
+    if(d>3){dx=toX/d*dt*3;dz=toZ/d*dt*3;}
   }else{
-    a.g.position.x+=Math.sin(a.phase)*dt*.25;
-    a.g.position.z+=Math.cos(a.phase*.7)*dt*.25;
+    dx=Math.sin(a.phase)*dt*.25;
+    dz=Math.cos(a.phase*.7)*dt*.25;
   }
-  a.g.position.y=height(a.g.position.x,a.g.position.z);
+  const next=collisions.move(a.g.position.x,a.g.position.z,dx,dz,.64,(x,z,r)=>base.collidesAt(x,z,r));
+  a.g.position.x=next.x;a.g.position.z=next.z;
+  a.g.position.y=height(next.x,next.z);
 }
 const collectedMeat=food.updateDrops(dt,time,player);
 if(collectedMeat>0){notify('Collected '+collectedMeat+' raw meat! Go to campfire to cook it.');updateUI();}

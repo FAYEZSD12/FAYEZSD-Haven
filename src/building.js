@@ -98,6 +98,17 @@ export function createBaseBuilding(THREE,scene,mesh,mat,height,camp,collisions=n
     }
     return null;
   }
+  // Unlike collidesAt (which is used for destructible walls), this also
+  // considers portable campfires solid without treating them as attackable walls.
+  function solidAt(x,z,radius=.34){
+    const wall=collidesAt(x,z,radius);
+    if(wall)return wall;
+    for(const structure of structures){
+      if(structure.type!=='campfire')continue;
+      if(Math.hypot(x-structure.x,z-structure.z)<radius+.83)return {tag:'portable campfire'};
+    }
+    return null;
+  }
   function place(type,player,yaw){
     if(!BUILDABLE.includes(type))return {ok:false,reason:'Not a buildable structure'};
     // Center of panel appears 3.4m in front of the player.
@@ -144,5 +155,5 @@ export function createBaseBuilding(THREE,scene,mesh,mat,height,camp,collisions=n
       createVisual(item.type,item.x,item.z,Number.isFinite(item.angle)?item.angle:0,Number.isFinite(item.hp)?item.hp:STATISTICS[item.type].hp);
     }
   }
-  return {nearTable,workbench,table,structures,place,collidesAt,damage,exportStructures,restore};
+  return {nearTable,workbench,table,structures,place,collidesAt,solidAt,damage,exportStructures,restore};
 }
